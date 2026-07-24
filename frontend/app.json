@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Smart Home",
+    "slug": "smart-home",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "smarthome",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
