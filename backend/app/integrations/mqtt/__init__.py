@@ -1,0 +1,1 @@
+"""Adafruit IO MQTT integration."""
