@@ -19,6 +19,7 @@ smarthome/
 ├── frontend/
 │   ├── app/                 # Màn hình và Expo Router
 │   ├── components/          # Component dùng lại
+│   │   └── navigation/      # Thanh điều hướng mobile
 │   ├── src/
 │   │   ├── config/
 │   │   ├── services/        # REST API và WebSocket
