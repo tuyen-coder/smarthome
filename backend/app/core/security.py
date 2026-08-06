@@ -21,3 +21,7 @@ def create_access_token(subject: str | int, **claims: Any) -> str:
     )
     payload = {"sub": str(subject), "exp": expires_at, **claims}
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+def decode_access_token(token: str) -> dict[str, Any]:
+    return jwt.decode(token, settings.secret_key, algorithms=["HS256"])

@@ -19,9 +19,10 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     secret_key: str = "change-me-with-at-least-32-random-characters"
     access_token_expire_minutes: int = 60
-    database_url: str = "sqlite+aiosqlite:///./data/smarthome.db"
-    redis_url: str = "redis://localhost:6379/0"
-    cors_origins: list[str] = Field(default_factory=list)
+    database_url: str = (
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthome"
+    )
+    cors_origins: list[str] = Field(default_factory=lambda: ["*"])
 
     mqtt_enabled: bool = False
     mqtt_host: str = "io.adafruit.com"
@@ -29,6 +30,7 @@ class Settings(BaseSettings):
     mqtt_username: str = ""
     mqtt_key: str = ""
     mqtt_topic_prefix: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
