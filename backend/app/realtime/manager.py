@@ -17,7 +17,7 @@ class ConnectionManager:
         for connection in self._connections:
             try:
                 await connection.send_json(payload)
-            except RuntimeError:
+            except (RuntimeError, OSError):
                 stale.append(connection)
         for connection in stale:
             self.disconnect(connection)

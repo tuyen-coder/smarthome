@@ -3,10 +3,21 @@
 .idea/
 
 .env
+.env.*
+!.env.example
 .venv/
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
 
 node_modules/
 .expo/
 dist/
+coverage/
+.eslintcache
+*.log
