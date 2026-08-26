@@ -21,3 +21,5 @@ dist/
 coverage/
 .eslintcache
 *.log
+
+note.txt

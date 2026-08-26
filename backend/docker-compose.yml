@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  # Tên service ở đây bạn có thể đặt là db hoặc postgres tùy ý
+  db:
+    image: postgres:15-alpine
+    container_name: smarthome-db # <--- Dòng này quyết định tên hiển thị trong Docker Desktop
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: smarthome
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+volumes:
+  pg_data:
