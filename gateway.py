@@ -20,7 +20,7 @@ AIO_USERNAME = os.getenv("AIO_USERNAME", "dadn253")
 AIO_KEY = os.getenv("AIO_KEY", "")
 
 # Subscribed Feeds: Incoming commands from Adafruit IO to control hardware
-SUBSCRIBED_FEEDS = ["bbc-led", "bbc-pump"]
+SUBSCRIBED_FEEDS = ["bbc-led", "bbc-led1", "bbc-led2", "bbc-led3", "bbc-led4", "bbc-pump"]
 
 # Feed mapping for incoming serial packets (KEY -> Adafruit IO Feed ID)
 FEED_MAP = {
@@ -47,10 +47,44 @@ def disconnected(client):
     print("Disconnected from Adafruit IO Broker!")
 
 def message(client, feed_id, payload):
-    """Callback triggered when a subscribed feed receives a new value."""
-    print(f"Received from Adafruit IO | Feed: {feed_id} | Command: {payload}")
-    # Write incoming feed command down to Micro:bit Serial as PAYLOAD# (e.g. 1#)
-    send_to_serial(payload)
+    """Callback triggered when a subscribed feed receives a new value from Adafruit IO dashboard."""
+    raw_val = str(payload).strip()
+    print(f"\n[ADAFRUIT IO INCOMING] Feed: {feed_id} | Payload: {raw_val}")
+
+    # 1. Multi-LED Feeds (bbc-led1, bbc-led2, bbc-led3, bbc-led4)
+    if feed_id == "bbc-led1":
+        cmd = f"LED:1:{raw_val}"
+    elif feed_id == "bbc-led2":
+        cmd = f"LED:2:{raw_val}"
+    elif feed_id == "bbc-led3":
+        cmd = f"LED:3:{raw_val}"
+    elif feed_id == "bbc-led4":
+        cmd = f"LED:4:{raw_val}"
+    # 2. Main LED Feed (bbc-led)
+    elif feed_id == "bbc-led":
+        upper = raw_val.upper()
+        if upper in ["1", "ON", "TRUE"]:
+            cmd = "ON"
+        elif upper in ["0", "OFF", "FALSE"]:
+            cmd = "OFF"
+        elif upper in ["L1", "L2", "L3", "L4"]:
+            cmd = upper
+        else:
+            cmd = raw_val
+    # 3. Pump Feed (bbc-pump)
+    elif feed_id == "bbc-pump":
+        upper = raw_val.upper()
+        if upper in ["1", "ON", "TRUE"]:
+            cmd = "PUMP:1"
+        elif upper in ["0", "OFF", "FALSE"]:
+            cmd = "PUMP:0"
+        else:
+            cmd = f"PUMP:{raw_val}"
+    else:
+        cmd = raw_val
+
+    # Write command down to board via Serial as !CMD#
+    send_to_serial(cmd)
 
 # Initialize MQTT Client
 client = MQTTClient(AIO_USERNAME, AIO_KEY)
@@ -73,33 +107,42 @@ def connect_mqtt():
             time.sleep(5)
 
 def find_microbit_port():
-    """Automatically scans serial ports to find a connected Micro:bit device."""
+    """Automatically scans serial ports to find a connected Yolo:bit, Micro:bit, or AIoT board."""
     ports = list(serial.tools.list_ports.comports())
     
-    # 1. Search by USB Vendor ID (0x0D28 is the official ARM mbed/Micro:bit VID)
+    # 1. Search by USB Vendor ID:
+    # - 0x303A: Espressif (Yolo:bit ESP32-S2/S3)
+    # - 0x0D28: ARM mbed / BBC Micro:bit DAPLink
+    # - 0x10C4: Silicon Labs CP210x
+    # - 0x1A86: WCH CH340
+    KNOWN_VIDS = [0x303a, 0x0d28, 0x10c4, 0x1a86]
     for p in ports:
-        if p.vid == 0x0d28:
+        if p.vid in KNOWN_VIDS:
             return p.device
             
     # 2. Search by keyword in the port description
     for p in ports:
         desc = p.description.lower()
-        if "micro:bit" in desc or "mbed" in desc or "daplink" in desc:
+        if any(keyword in desc for keyword in ["micro:bit", "yolo", "mbed", "daplink", "usb serial", "ch340", "cp210"]):
             return p.device
             
+    # 3. Fallback: If only 1 COM port is available, use it
+    if len(ports) == 1:
+        return ports[0].device
+
     return None
 
 def connect_serial():
-    """Tries to open serial port connection to Micro:bit."""
+    """Tries to open serial port connection to the AIoT / Yolo:bit / Micro:bit board."""
     global ser
     port = find_microbit_port()
     if not port:
-        print("Micro:bit port not auto-detected. Retrying search in 5 seconds...")
+        print("Device serial port not auto-detected. Retrying search in 5 seconds...")
         return False
     try:
         with serial_lock:
             ser = serial.Serial(port, baudrate=SERIAL_BAUDRATE, timeout=1)
-        print(f"Successfully connected to Micro:bit on serial port: {port}")
+        print(f"Successfully connected to AIoT / Yolo:bit device on serial port: {port}")
         return True
     except Exception as e:
         print(f"Failed to connect to serial port {port}: {e}. Retrying in 5 seconds...")
@@ -108,14 +151,16 @@ def connect_serial():
         return False
 
 def send_to_serial(payload):
-    """Sends command string down to the Micro:bit serial port as PAYLOAD#."""
+    """Sends command string down to the Micro:bit serial port as !PAYLOAD#\\n."""
     global ser
     with serial_lock:
         if ser and ser.is_open:
             try:
-                command = f"{payload}#"
+                raw_payload = str(payload).strip().replace("!", "").replace("#", "")
+                command = f"!{raw_payload}#\n"
                 ser.write(command.encode('utf-8'))
-                print(f"Sent to Micro:bit Serial -> '{command}'")
+                ser.flush()
+                print(f"Sent to Micro:bit Serial -> '{command.strip()}'")
             except Exception as e:
                 print(f"Error writing to serial: {e}")
         else:
@@ -173,11 +218,111 @@ def process_serial_data(data_str):
         
         parse_packet(packet)
 
+# Track local toggle states for L1, L2, L3, L4 (True = ON, False = OFF)
+led_states = {
+    "L1": False,
+    "L2": False,
+    "L3": False,
+    "L4": False
+}
+
+FEED_MAP_CONTROL = {
+    "L1": "bbc-led1",
+    "L2": "bbc-led2",
+    "L3": "bbc-led3",
+    "L4": "bbc-led4"
+}
+
+def console_cli():
+    """Interactive console CLI in gateway to simulate Adafruit IO feed activations."""
+    time.sleep(2)
+    print("\n" + "=" * 65)
+    print("  [+] SMART HOME GATEWAY & ADAFRUIT SIMULATOR ACTIVE")
+    print("  Type any command below and press Enter:")
+    print("    * L1 / l1  --> Toggle bbc-led1 on Adafruit IO (ON <-> OFF)")
+    print("    * L2 / l2  --> Toggle bbc-led2 on Adafruit IO (ON <-> OFF)")
+    print("    * L3 / l3  --> Toggle bbc-led3 on Adafruit IO (ON <-> OFF)")
+    print("    * L4 / l4  --> Toggle bbc-led4 on Adafruit IO (ON <-> OFF)")
+    print("    * OFF / 0  --> Turn OFF all feeds (0)")
+    print("    * ON       --> Turn ON all feeds (1)")
+    print("    * STATUS   --> Show current toggle states")
+    print("=" * 65 + "\n")
+
+    while True:
+        try:
+            cmd = input().strip()
+            if not cmd:
+                continue
+            upper_cmd = cmd.upper()
+
+            if upper_cmd in ["L1", "L2", "L3", "L4"]:
+                # Toggle state
+                led_states[upper_cmd] = not led_states[upper_cmd]
+                val = "1" if led_states[upper_cmd] else "0"
+                feed_name = FEED_MAP_CONTROL[upper_cmd]
+
+                # 1. Publish to Adafruit IO Feed
+                try:
+                    client.publish(feed_name, val)
+                    label = "ON (1)" if led_states[upper_cmd] else "OFF (0)"
+                    print(f"  [CONSOLE -> ADAFRUIT IO] Published '{feed_name}' = {val} ({upper_cmd} {label})")
+                except Exception as e:
+                    print(f"  [!] Error publishing to MQTT: {e}")
+
+                # 2. Also send directly down to serial
+                send_to_serial(f"LED:{upper_cmd[1]}:{val}")
+
+            elif upper_cmd in ["OFF", "0", "ALL OFF"]:
+                for key, feed_name in FEED_MAP_CONTROL.items():
+                    led_states[key] = False
+                    try:
+                        client.publish(feed_name, "0")
+                    except Exception:
+                        pass
+                try:
+                    client.publish("bbc-led", "0")
+                except Exception:
+                    pass
+                send_to_serial("OFF")
+                print("  [CONSOLE -> ADAFRUIT IO] All feeds published 0 (OFF)")
+
+            elif upper_cmd in ["ON", "1", "ALL ON"]:
+                for key, feed_name in FEED_MAP_CONTROL.items():
+                    led_states[key] = True
+                    try:
+                        client.publish(feed_name, "1")
+                    except Exception:
+                        pass
+                try:
+                    client.publish("bbc-led", "1")
+                except Exception:
+                    pass
+                send_to_serial("ON")
+                print("  [CONSOLE -> ADAFRUIT IO] All feeds published 1 (ON)")
+
+            elif upper_cmd == "STATUS":
+                print("  Current Dashboard States:")
+                for k, v in led_states.items():
+                    print(f"    * {k} ({FEED_MAP_CONTROL[k]}): {'ON' if v else 'OFF'}")
+
+            else:
+                send_to_serial(cmd)
+                print(f"  [CONSOLE] Sent raw command -> '{cmd}'")
+
+        except (EOFError, KeyboardInterrupt):
+            break
+        except Exception:
+            pass
+
 def main():
     global ser
     
     # Connect to MQTT in background
     connect_mqtt()
+
+    # Launch interactive console thread in background
+    cli_thread = threading.Thread(target=console_cli, daemon=True)
+    cli_thread.start()
     
     print("Starting gateway main loop...")
     while True:
@@ -195,8 +340,7 @@ def main():
                     data_str = data.decode('utf-8', errors='ignore')
                     process_serial_data(data_str)
             else:
-                # Idle delay to reduce CPU overhead
-                time.sleep(0.1)
+                time.sleep(0.05)
         except (serial.SerialException, OSError) as ser_err:
             print(f"Serial connection lost or encountered error: {ser_err}")
             with serial_lock:
