@@ -117,31 +117,54 @@ class LCDDisplay:
 # 2. ENVIRONMENTAL SENSOR COMPONENT (DHT20 + ONBOARD FALLBACK)
 # ==============================================================================
 class EnvironmentalSensor:
-    """Reads environmental temperature and relative humidity from DHT20 or Onboard sensor."""
-    def __init__(self):
-        self.dht = None
+    """Reads environmental temperature and relative humidity directly from DHT20 over shared I2C (0x38)."""
+    def __init__(self, i2c=None):
+        self.i2c = i2c
+        self._init_dht20()
+
+    def _init_dht20(self):
+        if not self.i2c:
+            return
         try:
-            from aiot_dht20 import DHT20
-            self.dht = DHT20()
+            time.sleep_ms(100)
+            # Check initialization status
+            self.i2c.writeto(0x38, bytearray([0x71]))
+            status = self.i2c.readfrom(0x38, 1)[0]
+            if (status & 0x18) != 0x18:
+                self.i2c.writeto(0x38, bytearray([0x1B, 0x00, 0x00]))
+                self.i2c.writeto(0x38, bytearray([0x1C, 0x00, 0x00]))
+                self.i2c.writeto(0x38, bytearray([0x1E, 0x00, 0x00]))
+                time.sleep_ms(10)
         except Exception:
-            self.dht = None
+            pass
 
     def read(self):
         """Returns tuple (temperature, humidity)."""
+        if self.i2c:
+            try:
+                # Trigger measurement
+                self.i2c.writeto(0x38, bytearray([0xAC, 0x33, 0x00]))
+                time.sleep_ms(80)
+                data = self.i2c.readfrom(0x38, 7)
+                if len(data) == 7 and (data[0] & 0x80) == 0:
+                    raw_humi = (data[1] << 12) | (data[2] << 4) | (data[3] >> 4)
+                    humidity = round((raw_humi * 100.0) / 1048576.0, 1)
+
+                    raw_temp = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
+                    temperature_val = round((raw_temp * 200.0 / 1048576.0) - 50.0, 1)
+
+                    if 0 <= humidity <= 100 and -40 <= temperature_val <= 85:
+                        return temperature_val, humidity
+            except Exception:
+                pass
+
+        # Fallback to internal temperature sensor if DHT20 not ready
         temp = 28.0
         try:
             temp = round(temperature(), 1)
         except Exception:
             pass
-
-        humi = 54.0
-        if self.dht:
-            try:
-                temp = round(self.dht.dht20_temperature(), 1)
-                humi = round(self.dht.dht20_humidity(), 1)
-            except Exception:
-                pass
-        return temp, humi
+        return temp, 54.0
 
 
 # ==============================================================================
@@ -369,7 +392,7 @@ class SmartHomeNode:
 
         # 2. Instantiate Device Components
         self.display = LCDDisplay(self.i2c)
-        self.env_sensor = EnvironmentalSensor()
+        self.env_sensor = EnvironmentalSensor(self.i2c)
         self.proximity_sensor = ProximitySensor(pin14, pin15)
         self.ir_receiver = IRRemoteReceiver(pin1)
         self.lighting = LightingController(pin0, num_leds=4)
