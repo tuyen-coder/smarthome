@@ -330,27 +330,55 @@ class LightingController:
 
 
 # ==============================================================================
-# 6. PUMP / RELAY CONTROLLER COMPONENT (ON P2)
+# 6. PUMP / RELAY CONTROLLER COMPONENT (ON P2 / P3)
 # ==============================================================================
 class PumpController:
-    """Controls the water pump / relay module connected to Port P2."""
-    def __init__(self, pin=pin2):
-        try:
-            self.pin_obj = Pin(pin.pin if hasattr(pin, 'pin') else pin, Pin.OUT)
-        except Exception:
-            self.pin_obj = None
+    """Controls the water pump / dual-channel module on Port P2/P3."""
+    def __init__(self, pin=None):
         self.is_on = False
         self.turn_off()
 
     def turn_on(self):
         self.is_on = True
-        if self.pin_obj:
-            self.pin_obj.value(1)
+        try:
+            pin2.write_digital(1)
+        except Exception:
+            pass
+        try:
+            pin3.write_digital(1)
+        except Exception:
+            pass
+        try:
+            p2 = Pin(pin2.pin if hasattr(pin2, 'pin') else 5, Pin.OUT)
+            p2.value(1)
+        except Exception:
+            pass
+        try:
+            p3 = Pin(pin3.pin if hasattr(pin3, 'pin') else 4, Pin.OUT)
+            p3.value(1)
+        except Exception:
+            pass
 
     def turn_off(self):
         self.is_on = False
-        if self.pin_obj:
-            self.pin_obj.value(0)
+        try:
+            pin2.write_digital(0)
+        except Exception:
+            pass
+        try:
+            pin3.write_digital(0)
+        except Exception:
+            pass
+        try:
+            p2 = Pin(pin2.pin if hasattr(pin2, 'pin') else 5, Pin.OUT)
+            p2.value(0)
+        except Exception:
+            pass
+        try:
+            p3 = Pin(pin3.pin if hasattr(pin3, 'pin') else 4, Pin.OUT)
+            p3.value(0)
+        except Exception:
+            pass
 
     def toggle(self):
         if self.is_on:
