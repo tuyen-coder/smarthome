@@ -15,16 +15,26 @@ from app.core.exceptions import (
     SmartHomeError,
 )
 from app.db.init_db import init_db
-from app.integrations.mqtt.client import mqtt_client
+
+# Import instance mqtt_client từ file client.py
+from app.integrations.mqtt.client import mqtt_client 
 from app.realtime.router import router as realtime_router
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # 1. Khởi tạo Database
     await init_db()
+    
     if settings.mqtt_enabled:
-        await mqtt_client.connect()
-    yield
+        print("Starting Adafruit MQTT Service...")
+        mqtt_client.start()  
+    
+    yield  
+    
+    if settings.mqtt_enabled:
+        print("Stopping Adafruit MQTT Service...")
+        mqtt_client.stop()   
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)

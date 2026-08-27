@@ -31,3 +31,6 @@ class AlertService:
             "resolve": {"is_read": True, "is_acknowledged": True, "is_resolved": True},
         }
         return await self.alerts.update_status(alert, **changes[action])
+
+    async def mark_all_read(self) -> None:
+        await self.alerts.mark_all_read()

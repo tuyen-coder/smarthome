@@ -3,7 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.models import AlertSeverity, DeviceType, UserRole
+from app.models import AlertSeverity, DeviceType, DeviceCategory, UserRole
+from enum import Enum
 
 
 class ORMModel(BaseModel):
@@ -63,6 +64,7 @@ class PermissionRead(ORMModel):
 
 class DeviceCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
+    category: DeviceCategory = DeviceCategory.ACTUATOR
     type: DeviceType = DeviceType.OTHER
     area_id: int
     feed_key: str | None = None
@@ -72,6 +74,7 @@ class DeviceCreate(BaseModel):
 class DeviceRead(ORMModel):
     id: int
     name: str
+    category: DeviceCategory
     type: DeviceType
     area_id: int
     feed_key: str | None
@@ -143,3 +146,12 @@ class DashboardSummary(BaseModel):
     online_devices: int
     active_devices: int
     unresolved_alerts: int
+
+class AdafruitFeed(str, Enum):
+    LED1 = "bbc-led1"
+    LED2 = "bbc-led2"
+    LED3 = "bbc-led3"
+    LED4 = "bbc-led4"
+    PUMP = "bbc-pump"
+    TEMP = "bbc-temp"
+    HUMI = "bbc-humi"

@@ -1,3 +1,5 @@
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { env } from '@/src/config/env';
 import type {
   Alert,
@@ -10,7 +12,41 @@ import type {
   User,
 } from '@/src/types/domain';
 
+const TOKEN_KEY = 'user_access_token';
 let accessToken = '';
+
+// Helper hỗ trợ lưu trữ cross-platform (Web dùng localStorage, Mobile dùng SecureStore)
+async function getStorageItem(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+  }
+  return await SecureStore.getItemAsync(key);
+}
+
+async function setStorageItem(key: string, value: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') localStorage.setItem(key, value);
+    return;
+  }
+  await SecureStore.setItemAsync(key, value);
+}
+
+async function deleteStorageItem(key: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') localStorage.removeItem(key);
+    return;
+  }
+  await SecureStore.deleteItemAsync(key);
+}
+
+// Khôi phục token từ bộ nhớ khi mở App
+export async function initAccessToken() {
+  const savedToken = await getStorageItem(TOKEN_KEY);
+  if (savedToken) {
+    accessToken = savedToken;
+  }
+  return savedToken;
+}
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(env.API_URL + path, {
@@ -34,8 +70,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  setAccessToken(token: string) {
+  async setAccessToken(token: string) {
     accessToken = token;
+    await setStorageItem(TOKEN_KEY, token);
+  },
+
+  async clearAccessToken() {
+    accessToken = '';
+    await deleteStorageItem(TOKEN_KEY);
   },
 
   async login(email: string, password: string) {
@@ -43,7 +85,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    accessToken = result.access_token;
+    
+    await this.setAccessToken(result.access_token);
     return result;
   },
 
@@ -63,6 +106,8 @@ export const api = {
   alerts: () => request<Alert[]>('/alerts'),
   updateAlert: (alertId: number, action: 'read' | 'acknowledge' | 'resolve') =>
     request<Alert>('/alerts/' + alertId + '/' + action, { method: 'PATCH' }),
+  markAllAlertsRead: () =>
+    request<void>('/alerts/mark-all-read', { method: 'PATCH' }),
   automations: () => request<Automation[]>('/automations'),
   toggleAutomation: (automationId: number, enabled: boolean) =>
     request<Automation>('/automations/' + automationId + '?enabled=' + enabled, {

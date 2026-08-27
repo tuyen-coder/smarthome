@@ -48,6 +48,12 @@ class AlertRepository(Repository[Alert]):
             alert.is_resolved = is_resolved
         return await self.commit(alert)
 
+    async def mark_all_read(self) -> None:
+        from sqlalchemy import update
+        statement = update(Alert).where(Alert.is_read.is_(False)).values(is_read=True)
+        await self.session.execute(statement)
+        await self.session.commit()
+
     async def unresolved_count(self) -> int:
         count = await self.session.scalar(
             select(func.count(Alert.id)).where(Alert.is_resolved.is_(False))

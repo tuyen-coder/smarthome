@@ -28,12 +28,22 @@ class UserRole(StrEnum):
     GUEST = "guest"
 
 
+# 1. Phân loại theo Bản chất Phần cứng (IoT Core Classification)
+class DeviceCategory(StrEnum):
+    SENSOR = "sensor"        # Thiết bị chỉ gửi dữ liệu (nhiệt độ, độ ẩm, chuyển động, ...)
+    ACTUATOR = "actuator"    # Thiết bị chấp hành nhận lệnh (công tắc, rơ-le, van nước, ...)
+    HYBRID = "hybrid"        # Thiết bị kết hợp (VD: Thermostat vừa đo vừa điều khiển)
+
+
+# 2. Phân loại theo Nghiệp vụ / Giao diện (UI/UX Classification)
 class DeviceType(StrEnum):
     LIGHT = "light"
     CLIMATE = "climate"
     SECURITY = "security"
     ENTERTAINMENT = "entertainment"
     CAMERA = "camera"
+    PUMP = "pump"
+    SENSOR_NODE = "sensor_node"
     OTHER = "other"
 
 
@@ -73,7 +83,18 @@ class Device(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
-    type: Mapped[DeviceType] = mapped_column(Enum(DeviceType), default=DeviceType.OTHER)
+    
+    # --- HYBRID APPROACH ---
+    # Phân loại bản chất thiết bị (cho Backend/Automation engine xử lý)
+    category: Mapped[DeviceCategory] = mapped_column(
+        Enum(DeviceCategory), default=DeviceCategory.ACTUATOR, index=True
+    )
+    # Phân loại theo domain hiển thị (cho UI/UX render icon/group)
+    type: Mapped[DeviceType] = mapped_column(
+        Enum(DeviceType), default=DeviceType.OTHER, index=True
+    )
+    # -----------------------
+
     area_id: Mapped[int] = mapped_column(
         ForeignKey("areas.id", ondelete="CASCADE"), index=True
     )
@@ -175,6 +196,7 @@ __all__ = [
     "AuditLog",
     "Automation",
     "Device",
+    "DeviceCategory",
     "DeviceType",
     "Telemetry",
     "User",

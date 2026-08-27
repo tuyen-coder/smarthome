@@ -1,10 +1,12 @@
 export type UserRole = 'admin' | 'member' | 'guest';
+export type DeviceCategory = 'SENSOR' | 'ACTUATOR' | 'HYBRID';
 export type DeviceType =
   | 'light'
   | 'climate'
   | 'security'
   | 'entertainment'
   | 'camera'
+  | 'pump' // <-- Thêm loại pump vào đây
   | 'other';
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 
@@ -35,12 +37,13 @@ export interface AreaPermission {
 export interface Device {
   id: number;
   name: string;
+  category: DeviceCategory;
   type: DeviceType;
   area_id: number;
   feed_key?: string | null;
   is_online: boolean;
   is_on: boolean;
-  state: Record<string, string | number | boolean>;
+  state: Record<string, unknown>;
   updated_at: string;
 }
 

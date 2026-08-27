@@ -9,6 +9,7 @@ from app.models import (
     Area,
     Automation,
     Device,
+    DeviceCategory,
     DeviceType,
     Telemetry,
     User,
@@ -25,67 +26,140 @@ async def init_db() -> None:
         if user_count:
             return
 
+        # 1. Tạo User Admin
         admin = User(
             name="Nguyễn Thiên Ân",
             email="admin@yolohome.vn",
             password_hash=hash_password("admin123"),
             role=UserRole.ADMIN,
         )
-        living_room = Area(name="Phòng Khách", description="Không gian sinh hoạt chung")
-        bedroom = Area(name="Phòng Ngủ", description="Không gian nghỉ ngơi")
-        kitchen = Area(name="Nhà Bếp", description="Khu vực bếp")
-        entrance = Area(name="Cửa Chính", description="Khu vực an ninh")
-        session.add_all([admin, living_room, bedroom, kitchen, entrance])
+
+        # 2. Tạo các Khu vực (Areas)
+        living_room = Area(
+            name="Phòng Khách", description="Khu vực hệ thống đèn RGB & Máy bơm"
+        )
+        bedroom = Area(
+            name="Phòng Ngủ", description="Khu vực nghỉ ngơi & chiếu sáng nhẹ"
+        )
+        kitchen = Area(
+            name="Phòng Bếp", description="Khu vực nấu nướng & giám sát an toàn"
+        )
+        garden = Area(
+            name="Sân Vườn / Ban Công", description="Khu vực tưới cây & cảm biến"
+        )
+
+        session.add_all([admin, living_room, bedroom, kitchen, garden])
         await session.flush()
 
-        light = Device(
-            name="Đèn Trần",
+        # 3. Tạo Các Thiết Bị (Devices)
+        # --- Phòng Khách ---
+        led1 = Device(
+            name="Đèn LED 1 (RGB)",
+            category=DeviceCategory.ACTUATOR,
             type=DeviceType.LIGHT,
             area_id=living_room.id,
-            feed_key="bbc-led",
-            is_on=True,
-            state={"brightness": 64},
+            feed_key="bbc-led1",
+            is_on=False,
+            state={"color": "#FFFFFF", "mode": "manual"},
         )
-        climate = Device(
-            name="Điều Hòa",
+        led2 = Device(
+            name="Đèn LED 2 (RGB)",
+            category=DeviceCategory.ACTUATOR,
+            type=DeviceType.LIGHT,
+            area_id=living_room.id,
+            feed_key="bbc-led2",
+            is_on=False,
+            state={"color": "#FFFFFF", "mode": "manual"},
+        )
+        temp_sensor = Device(
+            name="Cảm Biến Nhiệt Độ (DHT20)",
+            category=DeviceCategory.SENSOR,
             type=DeviceType.CLIMATE,
             area_id=living_room.id,
-            feed_key="bbc-pump",
+            feed_key="bbc-temp",
             is_on=True,
-            state={"temperature": 22},
+            state={"sensor_model": "DHT20"},
         )
-        purifier = Device(
-            name="Máy Lọc Không Khí",
+        humi_sensor = Device(
+            name="Cảm Biến Độ Ẩm (DHT20)",
+            category=DeviceCategory.SENSOR,
             type=DeviceType.CLIMATE,
+            area_id=living_room.id,
+            feed_key="bbc-humi",
+            is_on=True,
+            state={"sensor_model": "DHT20"},
+        )
+
+        # --- Phòng Ngủ ---
+        led3 = Device(
+            name="Đèn LED 3 (Phòng Ngủ)",
+            category=DeviceCategory.ACTUATOR,
+            type=DeviceType.LIGHT,
             area_id=bedroom.id,
-            is_on=True,
-            state={"air_quality": "Tốt", "power_watts": 12},
+            feed_key="bbc-led3",
+            is_on=False,
+            state={"color": "#FFC0CB", "mode": "manual"},
         )
-        door = Device(
-            name="Khóa Cửa Chính",
-            type=DeviceType.SECURITY,
-            area_id=entrance.id,
-            is_on=True,
-            state={"locked": True},
+
+        # --- Phòng Bếp ---
+        led4 = Device(
+            name="Đèn cảm biến LED 4",
+            category=DeviceCategory.HYBRID,
+            type=DeviceType.LIGHT,
+            area_id=kitchen.id,
+            feed_key="bbc-led4",
+            is_on=False,
+            state={
+                "auto_distance_mode": True,
+                "description": "1: Bật cố định | 0: Tự động theo khoảng cách",
+            },
         )
-        session.add_all([light, climate, purifier, door])
+
+        # --- Sân Vườn ---
+        pump = Device(
+            name="Máy Bơm Nước",
+            category=DeviceCategory.ACTUATOR,
+            type=DeviceType.PUMP,
+            area_id=garden.id,
+            feed_key="bbc-pump",
+            is_on=False,
+            state={"flow_rate": "normal"},
+        )
+
+        session.add_all([led1, led2, led3, led4, pump, temp_sensor, humi_sensor])
         await session.flush()
 
+        # 4. Tạo Dữ liệu Telemetry, Automations & Alerts
         session.add_all(
             [
                 Telemetry(
-                    device_id=climate.id, metric="temperature", value=28, unit="°C"
+                    device_id=temp_sensor.id,
+                    metric="temperature",
+                    value=29.5,
+                    unit="°C",
                 ),
-                Telemetry(device_id=purifier.id, metric="humidity", value=65, unit="%"),
+                Telemetry(
+                    device_id=humi_sensor.id,
+                    metric="humidity",
+                    value=70.0,
+                    unit="%",
+                ),
                 Automation(
-                    name="Tắt đèn khi rời nhà",
-                    trigger={"type": "presence", "value": "away"},
-                    action={"device_id": light.id, "is_on": False},
+                    name="Tự động bật Đèn 4 khi có người lại gần",
+                    enabled=True,
+                    trigger={"type": "distance", "operator": "<", "value_cm": 20},
+                    action={"device_id": led4.id, "mode": "auto_trigger"},
+                ),
+                Automation(
+                    name="Bật máy bơm khi nhiệt độ cao",
+                    enabled=False,
+                    trigger={"type": "temperature", "operator": ">", "value": 35},
+                    action={"device_id": pump.id, "is_on": True},
                 ),
                 Alert(
-                    device_id=door.id,
-                    title="An ninh",
-                    message="Cửa chính đã khóa",
+                    device_id=temp_sensor.id,
+                    title="Nhiệt độ phòng",
+                    message="Nhiệt độ hiện tại 29.5°C đang ở mức ổn định",
                     severity=AlertSeverity.INFO,
                 ),
             ]

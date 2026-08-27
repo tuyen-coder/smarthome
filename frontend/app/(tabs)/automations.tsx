@@ -21,10 +21,19 @@ function describe(automation: Automation) {
 }
 
 export default function AutomationsScreen() {
-  const [automations, setAutomations] = useState(demoAutomations);
+  const [automations, setAutomations] = useState<Automation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchAutomations = () => {
+    setIsLoading(true);
+    api.automations()
+      .then(setAutomations)
+      .catch((err) => console.error('[Automations] Fetch error:', err))
+      .finally(() => setIsLoading(false));
+  };
 
   useEffect(() => {
-    api.automations().then(setAutomations).catch(() => undefined);
+    fetchAutomations();
   }, []);
 
   const toggle = async (automation: Automation) => {
@@ -32,7 +41,12 @@ export default function AutomationsScreen() {
     setAutomations((items) =>
       items.map((item) => (item.id === automation.id ? { ...item, enabled } : item)),
     );
-    await api.toggleAutomation(automation.id, enabled).catch(() => undefined);
+    await api.toggleAutomation(automation.id, enabled).catch(() => {
+      // Revert if error
+      setAutomations((items) =>
+        items.map((item) => (item.id === automation.id ? { ...item, enabled: !enabled } : item)),
+      );
+    });
   };
 
   return (
@@ -62,37 +76,47 @@ export default function AutomationsScreen() {
 
       <Text style={styles.sectionTitle}>Quy tắc của bạn</Text>
       <View style={styles.list}>
-        {automations.map((automation) => (
-          <Pressable
-            key={automation.id}
-            onPress={() =>
-              router.push({
-                pathname: '/automations/[id]',
-                params: { id: String(automation.id) },
-              })
-            }>
-            <SurfaceCard style={styles.card}>
-              <View style={[styles.ruleIcon, automation.enabled && styles.ruleIconEnabled]}>
-                <Ionicons
-                  color={automation.enabled ? colors.primary : colors.textMuted}
-                  name={automation.trigger.type === 'time' ? 'time-outline' : 'git-branch-outline'}
-                  size={23}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Đang tải quy tắc...</Text>
+          </View>
+        ) : automations.length === 0 ? (
+          <SurfaceCard style={styles.emptyCard}>
+            <Text style={styles.emptyText}>Chưa có quy tắc tự động hóa nào</Text>
+          </SurfaceCard>
+        ) : (
+          automations.map((automation) => (
+            <Pressable
+              key={automation.id}
+              onPress={() =>
+                router.push({
+                  pathname: '/automations/[id]',
+                  params: { id: String(automation.id) },
+                })
+              }>
+              <SurfaceCard style={styles.card}>
+                <View style={[styles.ruleIcon, automation.enabled && styles.ruleIconEnabled]}>
+                  <Ionicons
+                    color={automation.enabled ? colors.primary : colors.textMuted}
+                    name={automation.trigger.type === 'time' ? 'time-outline' : 'git-branch-outline'}
+                    size={23}
+                  />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={styles.ruleName}>{automation.name}</Text>
+                  <Text style={styles.ruleDescription}>{describe(automation)}</Text>
+                </View>
+                <Switch
+                  ios_backgroundColor={colors.borderStrong}
+                  onValueChange={() => toggle(automation)}
+                  thumbColor={colors.surface}
+                  trackColor={{ false: colors.borderStrong, true: colors.primary }}
+                  value={automation.enabled}
                 />
-              </View>
-              <View style={styles.flex}>
-                <Text style={styles.ruleName}>{automation.name}</Text>
-                <Text style={styles.ruleDescription}>{describe(automation)}</Text>
-              </View>
-              <Switch
-                ios_backgroundColor={colors.borderStrong}
-                onValueChange={() => toggle(automation)}
-                thumbColor={colors.surface}
-                trackColor={{ false: colors.borderStrong, true: colors.primary }}
-                value={automation.enabled}
-              />
-            </SurfaceCard>
-          </Pressable>
-        ))}
+              </SurfaceCard>
+            </Pressable>
+          ))
+        )}
       </View>
     </AppScreen>
   );
@@ -115,4 +139,8 @@ const styles = StyleSheet.create({
   ruleIconEnabled: { backgroundColor: colors.primarySoft },
   ruleName: { color: colors.text, fontSize: 15, fontWeight: '700' },
   ruleDescription: { marginTop: 4, color: colors.textMuted, fontSize: 12 },
+  loadingContainer: { paddingVertical: 30, alignItems: 'center' },
+  loadingText: { marginTop: 8, color: colors.textMuted, fontSize: 14 },
+  emptyCard: { padding: 24, alignItems: 'center' },
+  emptyText: { color: colors.textMuted, fontSize: 14 },
 });

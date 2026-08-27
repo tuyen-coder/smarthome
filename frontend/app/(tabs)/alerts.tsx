@@ -21,13 +21,28 @@ const severity: Record<AlertSeverity, { icon: IconName; color: string; soft: str
 };
 
 export default function AlertsScreen() {
-  const [alerts, setAlerts] = useState(demoAlerts);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchAlerts = () => {
+    setIsLoading(true);
+    api.alerts()
+      .then(setAlerts)
+      .catch((err) => console.error('[Alerts] Fetch error:', err))
+      .finally(() => setIsLoading(false));
+  };
 
   useEffect(() => {
-    api.alerts().then(setAlerts).catch(() => undefined);
+    fetchAlerts();
   }, []);
 
-  const markAll = () => setAlerts((items) => items.map((item) => ({ ...item, is_read: true })));
+  const markAll = async () => {
+    setAlerts((items) => items.map((item) => ({ ...item, is_read: true })));
+    await api.markAllAlertsRead().catch(() => {
+      // Revert if error
+      fetchAlerts();
+    });
+  };
 
   return (
     <AppScreen>
@@ -67,29 +82,39 @@ export default function AlertsScreen() {
       </View>
 
       <View style={styles.list}>
-        {alerts.map((alert) => {
-          const appearance = severity[alert.severity];
-          return (
-            <Pressable
-              key={alert.id}
-              onPress={() =>
-                router.push({
-                  pathname: '/alerts/[id]',
-                  params: { id: String(alert.id) },
-                })
-              }
-              style={[styles.alert, { backgroundColor: appearance.soft }, alert.is_read && styles.read]}>
-              <View style={[styles.alertIcon, { backgroundColor: colors.surface }]}>
-                <Ionicons color={appearance.color} name={appearance.icon} size={20} />
-              </View>
-              <View style={styles.flex}>
-                <Text style={[styles.alertTitle, { color: appearance.color }]}>{alert.title}</Text>
-                <Text style={styles.alertMessage}>{alert.message}</Text>
-              </View>
-              {!alert.is_read ? <View style={styles.unread} /> : null}
-            </Pressable>
-          );
-        })}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Đang tải thông báo...</Text>
+          </View>
+        ) : alerts.length === 0 ? (
+          <SurfaceCard style={styles.emptyCard}>
+            <Text style={styles.emptyText}>Chưa có thông báo nào</Text>
+          </SurfaceCard>
+        ) : (
+          alerts.map((alert) => {
+            const appearance = severity[alert.severity as AlertSeverity] ?? severity.info;
+            return (
+              <Pressable
+                key={alert.id}
+                onPress={() =>
+                  router.push({
+                    pathname: '/alerts/[id]',
+                    params: { id: String(alert.id) },
+                  })
+                }
+                style={[styles.alert, { backgroundColor: appearance.soft }, alert.is_read && styles.read]}>
+                <View style={[styles.alertIcon, { backgroundColor: colors.surface }]}>
+                  <Ionicons color={appearance.color} name={appearance.icon} size={20} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={[styles.alertTitle, { color: appearance.color }]}>{alert.title}</Text>
+                  <Text style={styles.alertMessage}>{alert.message}</Text>
+                </View>
+                {!alert.is_read ? <View style={styles.unread} /> : null}
+              </Pressable>
+            );
+          })
+        )}
       </View>
     </AppScreen>
   );
@@ -122,4 +147,8 @@ const styles = StyleSheet.create({
   alertTitle: { fontSize: 13, fontWeight: '700' },
   alertMessage: { marginTop: 4, color: colors.text, fontSize: 14, lineHeight: 19 },
   unread: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
+  loadingContainer: { paddingVertical: 30, alignItems: 'center' },
+  loadingText: { marginTop: 8, color: colors.textMuted, fontSize: 14 },
+  emptyCard: { padding: 24, alignItems: 'center' },
+  emptyText: { color: colors.textMuted, fontSize: 14 },
 });

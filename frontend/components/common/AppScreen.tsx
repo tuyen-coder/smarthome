@@ -8,11 +8,13 @@ import { colors } from '@/src/theme/colors';
 type Props = {
   children: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
+  style?: StyleProp<ViewStyle>; // 1. Thêm style vào Props
 };
 
-export function AppScreen({ children, contentStyle }: Props) {
+// 2. Nhận prop style
+export function AppScreen({ children, contentStyle, style }: Props) {
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
+    <SafeAreaView edges={['top']} style={[styles.safeArea, style]}>
       <ScrollView
         contentContainerStyle={[styles.content, contentStyle]}
         showsVerticalScrollIndicator={false}>

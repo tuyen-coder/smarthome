@@ -1,8 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.deps import CurrentUser, DatabaseSession
 from app.schemas import LoginRequest, TokenResponse, UserRead
 from app.services.auth_service import AuthService
+
 
 router = APIRouter()
 
@@ -16,3 +18,15 @@ async def login(payload: LoginRequest, session: DatabaseSession) -> TokenRespons
 @router.get("/me", response_model=UserRead)
 async def me(user: CurrentUser) -> UserRead:
     return UserRead.model_validate(user)
+
+
+@router.post("/login-swagger", response_model=TokenResponse, include_in_schema=False)
+async def login_swagger(
+    session: DatabaseSession, 
+    form_data: OAuth2PasswordRequestForm = Depends()
+) -> TokenResponse:
+    # Đổi username=form_data.username thành email=form_data.username
+    payload = LoginRequest(email=form_data.username, password=form_data.password)
+    
+    _, token = await AuthService(session).authenticate(payload)
+    return TokenResponse(access_token=token)

@@ -1,6 +1,6 @@
 from sqlalchemy import func, select
 
-from app.models import Device, DeviceType
+from app.models import Device, DeviceType, DeviceCategory
 from app.repositories.base import Repository
 
 
@@ -19,6 +19,7 @@ class DeviceRepository(Repository[Device]):
         self,
         *,
         name: str,
+        device_category: DeviceCategory,
         device_type: DeviceType,
         area_id: int,
         feed_key: str | None,
@@ -26,6 +27,7 @@ class DeviceRepository(Repository[Device]):
     ) -> Device:
         device = Device(
             name=name,
+            category=device_category,
             type=device_type,
             area_id=area_id,
             feed_key=feed_key,
@@ -50,3 +52,8 @@ class DeviceRepository(Repository[Device]):
             select(func.count(Device.id)).where(Device.is_on.is_(True))
         )
         return int(online or 0), int(active or 0)
+
+    async def get_by_feed_key(self, feed_key: str) -> Device | None:
+        statement = select(Device).where(Device.feed_key == feed_key)
+        result = await self.session.scalars(statement)
+        return result.first()

@@ -13,12 +13,16 @@ class ConnectionManager:
         self._connections.discard(websocket)
 
     async def broadcast(self, payload: dict[str, object]) -> None:
+        # Copy danh sách kết nối hiện tại để tránh lỗi đổi kích thước Set khi lặp
+        connections = list(self._connections)
         stale: list[WebSocket] = []
-        for connection in self._connections:
+
+        for connection in connections:
             try:
                 await connection.send_json(payload)
             except (RuntimeError, OSError):
                 stale.append(connection)
+
         for connection in stale:
             self.disconnect(connection)
 

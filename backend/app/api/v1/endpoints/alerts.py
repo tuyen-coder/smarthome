@@ -31,3 +31,12 @@ async def update_alert(
     session: DatabaseSession,
 ):
     return await AlertService(session).mark(alert_id, action)
+
+
+@router.patch("/mark-all-read", response_model=dict)
+async def mark_all_alerts_read(
+    _: CurrentUser,
+    session: DatabaseSession,
+):
+    await AlertService(session).mark_all_read()
+    return {"status": "success"}
