@@ -13,13 +13,14 @@ type Props = {
   value: number;
   onChange: (value: number) => void;
   onComplete: (value: number) => void;
+  disabled?: boolean;
 };
 
 function clamp(value: number) {
   return Math.min(100, Math.max(0, value));
 }
 
-export function BrightnessSlider({ value, onChange, onComplete }: Props) {
+export function BrightnessSlider({ value, onChange, onComplete, disabled = false }: Props) {
   const width = useRef(1);
   const startValue = useRef(value);
   const latestValue = useRef(value);
@@ -33,25 +34,31 @@ export function BrightnessSlider({ value, onChange, onComplete }: Props) {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => !disabled,
+      onMoveShouldSetPanResponder: () => !disabled,
       onPanResponderGrant: (event: GestureResponderEvent) => {
+        if (disabled) return;
         const nextValue = clamp((event.nativeEvent.locationX / width.current) * 100);
         startValue.current = nextValue;
         latestValue.current = nextValue;
         onChangeRef.current(nextValue);
       },
       onPanResponderMove: (_, gesture) => {
+        if (disabled) return;
         const nextValue = clamp(
           startValue.current + (gesture.dx / width.current) * 100,
         );
         latestValue.current = nextValue;
         onChangeRef.current(nextValue);
       },
-      onPanResponderRelease: () =>
-        onCompleteRef.current(Math.round(latestValue.current)),
-      onPanResponderTerminate: () =>
-        onCompleteRef.current(Math.round(latestValue.current)),
+      onPanResponderRelease: () => {
+        if (disabled) return;
+        onCompleteRef.current(Math.round(latestValue.current));
+      },
+      onPanResponderTerminate: () => {
+        if (disabled) return;
+        onCompleteRef.current(Math.round(latestValue.current));
+      },
     }),
   ).current;
 
@@ -60,6 +67,7 @@ export function BrightnessSlider({ value, onChange, onComplete }: Props) {
   };
 
   const adjust = (difference: number) => {
+    if (disabled) return;
     const nextValue = clamp(currentValue + difference);
     latestValue.current = nextValue;
     onChange(nextValue);
@@ -79,8 +87,8 @@ export function BrightnessSlider({ value, onChange, onComplete }: Props) {
         adjust(event.nativeEvent.actionName === 'increment' ? 5 : -5)
       }
       onLayout={handleLayout}
-      style={styles.track}
-      {...panResponder.panHandlers}>
+      style={[styles.track, disabled && { opacity: 0.4 }]}
+      {...(!disabled ? panResponder.panHandlers : {})}>
       <View style={styles.rail} />
       <View style={[styles.fill, { width: `${currentValue}%` }]}>
         <View style={styles.thumb} />

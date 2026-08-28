@@ -1,32 +1,62 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppScreen } from '@/components/common/AppScreen';
 import { SurfaceCard } from '@/components/common/SurfaceCard';
-import { demoUsers } from '@/src/data/demo';
 import { api } from '@/src/services/api';
 import { colors } from '@/src/theme/colors';
-import type { UserRole } from '@/src/types/domain';
+import { useHome } from '@/src/context/HomeContext';
+import type { HomeRole, HomeMember } from '@/src/types/domain';
 
-const roleLabels: Record<UserRole, string> = {
+const roleLabels: Record<HomeRole, string> = {
+  owner: 'Chủ nhà',
   admin: 'Admin',
-  member: 'Member',
-  guest: 'Guest',
+  member: 'Thành viên',
+  guest: 'Khách',
 };
 
 export default function UsersScreen() {
-  const [users, setUsers] = useState(demoUsers);
+  const { activeHome } = useHome();
+  const [members, setMembers] = useState<HomeMember[]>([]);
   const [query, setQuery] = useState('');
+  const [selectedMember, setSelectedMember] = useState<HomeMember | null>(null);
+
+  const fetchMembers = () => {
+    if (activeHome) {
+      api.homeMembers(activeHome.id).then(setMembers).catch(console.error);
+    }
+  };
 
   useEffect(() => {
-    api.users().then(setUsers).catch(() => undefined);
-  }, []);
+    fetchMembers();
+  }, [activeHome]);
 
-  const visible = users.filter((user) =>
-    (user.name + user.email).toLowerCase().includes(query.toLowerCase()),
+  const visible = members.filter((member) =>
+    (member.user.name + member.user.email).toLowerCase().includes(query.toLowerCase()),
   );
+
+  const handleRemove = async (targetUserId: number) => {
+    if (!activeHome) return;
+    try {
+      await api.removeHomeMember(activeHome.id, targetUserId);
+      fetchMembers();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleChangeRole = async (role: 'owner' | 'admin' | 'member' | 'guest') => {
+    if (!activeHome || !selectedMember) return;
+    try {
+      await api.updateHomeMember(activeHome.id, selectedMember.user_id, role);
+      fetchMembers();
+      setSelectedMember(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <AppScreen>
@@ -51,24 +81,28 @@ export default function UsersScreen() {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>THÀNH VIÊN GIA ĐÌNH</Text>
-        <Text style={styles.count}>{users.length} Thành viên</Text>
+        <Text style={styles.count}>{members.length} Thành viên</Text>
       </View>
 
       <View style={styles.list}>
-        {visible.map((user) => (
-          <SurfaceCard key={user.id} style={styles.userCard}>
+        {visible.map((member) => (
+          <Pressable key={member.id} onPress={() => setSelectedMember(member)}>
+            <SurfaceCard style={styles.userCard}>
             <View style={styles.avatar}><Ionicons color={colors.primary} name="person" size={24} /></View>
             <View style={styles.flex}>
-              <Text style={styles.name}>{user.name}</Text>
-              <Text style={styles.email}>{user.email}</Text>
+              <Text style={styles.name}>{member.user.name}</Text>
+              <Text style={styles.email}>{member.user.email}</Text>
             </View>
-            <View style={[styles.role, user.role === 'admin' && styles.adminRole]}>
-              <Text style={[styles.roleText, user.role === 'admin' && styles.adminRoleText]}>
-                {roleLabels[user.role]}
+            <View style={[styles.role, (member.role === 'admin' || member.role === 'owner') && styles.adminRole]}>
+              <Text style={[styles.roleText, (member.role === 'admin' || member.role === 'owner') && styles.adminRoleText]}>
+                {roleLabels[member.role]}
               </Text>
             </View>
-            <Ionicons color={colors.textMuted} name="chevron-forward" size={19} />
-          </SurfaceCard>
+            <Pressable onPress={() => handleRemove(member.user_id)} style={styles.removeButton}>
+              <Ionicons color={colors.danger} name="trash-outline" size={19} />
+            </Pressable>
+            </SurfaceCard>
+          </Pressable>
         ))}
       </View>
 
@@ -86,6 +120,54 @@ export default function UsersScreen() {
         <Ionicons color={colors.surface} name="person-add-outline" size={20} />
         <Text style={styles.addText}>Thêm người dùng mới</Text>
       </Pressable>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={selectedMember !== null}
+        onRequestClose={() => setSelectedMember(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chi tiết tài khoản</Text>
+              <Pressable onPress={() => setSelectedMember(null)}>
+                <Ionicons color={colors.textSubtle} name="close" size={24} />
+              </Pressable>
+            </View>
+
+            {selectedMember && (
+              <>
+                <View style={styles.modalDetailRow}>
+                  <Text style={styles.modalDetailLabel}>Họ và tên</Text>
+                  <TextInput editable={false} style={styles.modalDetailInput} value={selectedMember.user.name} />
+                </View>
+                <View style={styles.modalDetailRow}>
+                  <Text style={styles.modalDetailLabel}>Email (Không thể sửa)</Text>
+                  <TextInput editable={false} style={styles.modalDetailInput} value={selectedMember.user.email} />
+                </View>
+
+                <Text style={[styles.modalDetailLabel, { marginTop: 16, marginBottom: 8 }]}>Chức vụ</Text>
+                <View style={styles.roleOptions}>
+                  {(['admin', 'member', 'guest'] as const).map(role => (
+                    <Pressable
+                      key={role}
+                      onPress={() => handleChangeRole(role)}
+                      style={[
+                        styles.roleOption,
+                        selectedMember.role === role && styles.roleOptionSelected
+                      ]}>
+                      <Text style={[
+                        styles.roleOptionText,
+                        selectedMember.role === role && styles.roleOptionTextSelected
+                      ]}>{roleLabels[role]}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </AppScreen>
   );
 }
@@ -114,4 +196,17 @@ const styles = StyleSheet.create({
   permissionText: { marginTop: 5, color: colors.info, fontSize: 12, lineHeight: 19 },
   addButton: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 28, borderRadius: 28, backgroundColor: colors.primary },
   addText: { color: colors.surface, fontWeight: '600' },
+  removeButton: { padding: 8 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalContent: { width: '100%', backgroundColor: colors.surface, borderRadius: 24, padding: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  modalTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  modalDetailRow: { marginBottom: 16 },
+  modalDetailLabel: { color: colors.textMuted, fontSize: 13, marginBottom: 8 },
+  modalDetailInput: { backgroundColor: colors.background, color: colors.textMuted, padding: 14, borderRadius: 16, fontSize: 15 },
+  roleOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  roleOption: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+  roleOptionSelected: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+  roleOptionText: { color: colors.text, fontSize: 14 },
+  roleOptionTextSelected: { color: colors.primary, fontWeight: '700' },
 });

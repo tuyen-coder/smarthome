@@ -1,16 +1,18 @@
 import type { ComponentProps } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { router, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader } from '@/components/common/AppHeader';
 import { AppScreen } from '@/components/common/AppScreen';
 import { SurfaceCard } from '@/components/common/SurfaceCard';
+
 import { api } from '@/src/services/api';
 import { realtime } from '@/src/services/realtime';
 import { colors } from '@/src/theme/colors';
-import type { Area, DashboardSummary } from '@/src/types/domain';
+import { useHome } from '@/src/context/HomeContext';
+import type { Area, DashboardSummary, Device } from '@/src/types/domain';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -35,27 +37,34 @@ function MetricCard({
 }
 
 export default function DashboardScreen() {
+  const { activeHome, isLoading: homeLoading } = useHome();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Tải dữ liệu ban đầu từ API
-  const fetchDashboardData = () => {
-    Promise.all([api.dashboard(), api.areas()])
-      .then(([nextSummary, nextAreas]) => {
-        setSummary(nextSummary);
-        setAreas(nextAreas);
-      })
-      .catch((err) => {
-        console.error('[Dashboard] Fetch error:', err);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+  const fetchData = async () => {
+    if (!activeHome) return;
+    try {
+      setIsLoading(true);
+      const [nextSummary, nextAreas] = await Promise.all([
+        api.dashboard(activeHome.id),
+        api.areas(activeHome.id),
+      ]);
+      setSummary(nextSummary);
+      setAreas(nextAreas);
+    } catch (err: any) {
+      setError(err.message || 'Lỗi tải dữ liệu');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   useEffect(() => {
-    fetchDashboardData();
+    if (!homeLoading) {
+      fetchData();
+    }
 
     // Kết nối WebSocket & lắng nghe sự kiện
     realtime.connect();
@@ -77,7 +86,7 @@ export default function DashboardScreen() {
             if (!isNaN(numericVal)) next.humidity = numericVal;
           } else {
             // Khi có trạng thái thiết bị bật/tắt thay đổi, fetch lại để cập nhật active_devices
-            fetchDashboardData();
+            fetchData();
             return prev;
           }
 
@@ -89,25 +98,33 @@ export default function DashboardScreen() {
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [activeHome, homeLoading]);
+
+  if (homeLoading || isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!activeHome) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={[styles.errorText, { color: colors.danger, textAlign: 'center' }]}>Không tìm thấy nhà. Vui lòng tạo nhà mới.</Text>
+      </View>
+    );
+  }
 
   return (
     <AppScreen>
       <AppHeader />
-
-      {isLoading && !summary ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={colors.primary} size="large" />
-          <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.metrics}>
-            <MetricCard
-              icon="thermometer-outline"
-              label="Nhiệt độ"
-              value={summary?.temperature !== undefined ? `${summary.temperature}°C` : '--°C'}
-            />
+      <View style={styles.metrics}>
+        <MetricCard
+          icon="thermometer-outline"
+          label="Nhiệt độ"
+          value={summary?.temperature !== undefined ? `${summary.temperature}°C` : '--°C'}
+        />
             <MetricCard
               icon="water-outline"
               label="Độ ẩm"
@@ -175,8 +192,6 @@ export default function DashboardScreen() {
               <Text style={styles.homeText}>Không gian sống kết nối, an toàn và thoải mái.</Text>
             </View>
           </SurfaceCard>
-        </>
-      )}
     </AppScreen>
   );
 }
@@ -197,6 +212,7 @@ const styles = StyleSheet.create({
   metricCard: { width: '47.8%', minHeight: 108, padding: 16 },
   metricValue: { marginTop: 4, color: colors.text, fontSize: 18, fontWeight: '700' },
   metricLabel: { marginTop: 2, color: colors.textMuted, fontSize: 14 },
+  errorText: { marginTop: 12, color: colors.danger, fontSize: 14, textAlign: 'center' },
   status: {
     flexDirection: 'row',
     alignItems: 'center',

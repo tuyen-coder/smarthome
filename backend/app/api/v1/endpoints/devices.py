@@ -11,9 +11,10 @@ router = APIRouter()
 async def list_devices(
     user: CurrentUser,
     session: DatabaseSession,
+    home_id: int,
     area_id: int | None = None,
 ) -> list:
-    return await DeviceService(session).list(user, area_id)
+    return await DeviceService(session).list(user, home_id, area_id)
 
 
 @router.post("", response_model=DeviceRead, status_code=status.HTTP_201_CREATED)

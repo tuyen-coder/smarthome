@@ -8,6 +8,8 @@ import type {
   Automation,
   DashboardSummary,
   Device,
+  Home,
+  HomeMember,
   TokenResponse,
   User,
 } from '@/src/types/domain';
@@ -90,11 +92,66 @@ export const api = {
     return result;
   },
 
+  register: (payload: any) =>
+    request<User>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
   me: () => request<User>('/auth/me'),
-  dashboard: () => request<DashboardSummary>('/telemetry/dashboard'),
-  areas: () => request<Area[]>('/areas'),
-  devices: (areaId?: number) =>
-    request<Device[]>('/devices' + (areaId ? '?area_id=' + areaId : '')),
+  changePassword: (payload: { old_password: string; new_password: string }) =>
+    request<{ message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  homes: () => request<Home[]>('/homes'),
+  createHome: (payload: { name: string; address?: string }) =>
+    request<Home>('/homes', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  homeMembers: (homeId: number) => request<HomeMember[]>('/homes/' + homeId + '/members'),
+  myRole: (homeId: number) => request<{ role: string | null }>('/homes/' + homeId + '/my_role'),
+  addHomeMember: (homeId: number, payload: { email: string; role: string }) =>
+    request<HomeMember>(`/homes/${homeId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateHomeMember: (homeId: number, targetUserId: number, role: string) =>
+    request<HomeMember>(`/homes/${homeId}/members/${targetUserId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    }),
+  removeHomeMember: (homeId: number, targetUserId: number) =>
+    request<void>(`/homes/${homeId}/members/${targetUserId}`, {
+      method: 'DELETE',
+    }),
+  dashboard: (homeId: number) => request<DashboardSummary>('/telemetry/dashboard?home_id=' + homeId),
+  areas: (homeId: number) => request<Area[]>('/areas?home_id=' + homeId),
+  createArea: (payload: { name: string; home_id: number }) =>
+    request<Area>('/areas', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  deleteArea: (areaId: number) =>
+    request<void>(`/areas/${areaId}`, {
+      method: 'DELETE',
+    }),
+  getPermissions: (homeId: number, userId: number) =>
+    request<AreaPermission[]>(`/homes/${homeId}/members/${userId}/permissions`),
+  myPermissions: (homeId: number) =>
+    request<AreaPermission[]>(`/homes/${homeId}/my_permissions`),
+  grantPermission: (
+    areaId: number,
+    userId: number,
+    payload: { can_view: boolean; can_control: boolean },
+  ) =>
+    request<AreaPermission>('/areas/' + areaId + '/permissions/' + userId, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  devices: (homeId: number, areaId?: number) =>
+    request<Device[]>('/devices?home_id=' + homeId + (areaId ? '&area_id=' + areaId : '')),
   commandDevice: (
     deviceId: number,
     payload: { is_on?: boolean; state?: Record<string, unknown> },
@@ -103,12 +160,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  alerts: () => request<Alert[]>('/alerts'),
+  alerts: (homeId: number) => request<Alert[]>('/alerts?home_id=' + homeId),
   updateAlert: (alertId: number, action: 'read' | 'acknowledge' | 'resolve') =>
     request<Alert>('/alerts/' + alertId + '/' + action, { method: 'PATCH' }),
-  markAllAlertsRead: () =>
-    request<void>('/alerts/mark-all-read', { method: 'PATCH' }),
-  automations: () => request<Automation[]>('/automations'),
+  markAllAlertsRead: (homeId: number) =>
+    request<void>('/alerts/mark-all-read?home_id=' + homeId, { method: 'PATCH' }),
+  automations: (homeId: number) => request<Automation[]>('/automations?home_id=' + homeId),
   toggleAutomation: (automationId: number, enabled: boolean) =>
     request<Automation>('/automations/' + automationId + '?enabled=' + enabled, {
       method: 'PATCH',
@@ -124,20 +181,5 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  createArea: (payload: { name: string; description?: string }) =>
-    request<Area>('/areas', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  deleteArea: (areaId: number) =>
-    request<void>('/areas/' + areaId, { method: 'DELETE' }),
-  grantPermission: (
-    areaId: number,
-    userId: number,
-    payload: { can_view: boolean; can_control: boolean },
-  ) =>
-    request<AreaPermission>('/areas/' + areaId + '/permissions/' + userId, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    }),
+
 };

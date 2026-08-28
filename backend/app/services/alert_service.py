@@ -10,11 +10,12 @@ class AlertService:
     def __init__(self, session: AsyncSession) -> None:
         self.alerts = AlertRepository(session)
 
-    async def list(self, unresolved_only: bool = False) -> list[Alert]:
-        return await self.alerts.list(unresolved_only)
+    async def list(self, home_id: int, unresolved_only: bool = False) -> list[Alert]:
+        return await self.alerts.list(home_id, unresolved_only)
 
     async def create(self, payload: AlertCreate) -> Alert:
         return await self.alerts.create(
+            home_id=payload.home_id,
             device_id=payload.device_id,
             user_id=payload.user_id,
             user_name=payload.user_name,
@@ -34,5 +35,5 @@ class AlertService:
         }
         return await self.alerts.update_status(alert, **changes[action])
 
-    async def mark_all_read(self) -> None:
-        await self.alerts.mark_all_read()
+    async def mark_all_read(self, home_id: int) -> None:
+        await self.alerts.mark_all_read(home_id)

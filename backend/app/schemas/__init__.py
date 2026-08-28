@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.models import AlertSeverity, DeviceType, DeviceCategory, UserRole
+from app.models import AlertSeverity, DeviceType, DeviceCategory, UserRole, HomeRole
 from enum import Enum
 
 
@@ -28,6 +28,11 @@ class UserCreate(BaseModel):
     role: UserRole = UserRole.MEMBER
 
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=6, max_length=72)
+
+
 class UserRead(ORMModel):
     id: int
     name: str
@@ -37,13 +42,55 @@ class UserRead(ORMModel):
     created_at: datetime
 
 
+class HomeCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    address: str | None = None
+
+
+class HomeUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    address: str | None = None
+
+
+class HomeRead(ORMModel):
+    id: int
+    name: str
+    address: str | None
+    owner_id: int
+    created_at: datetime
+
+
+class HomeMemberCreate(BaseModel):
+    email: EmailStr
+    role: HomeRole = HomeRole.MEMBER
+
+
+class HomeMemberUpdate(BaseModel):
+    role: HomeRole
+
+
+class HomeMemberRead(ORMModel):
+    id: int
+    user_id: int
+    home_id: int
+    role: HomeRole
+    joined_at: datetime
+    user: UserRead
+
+
+class MyRoleResponse(BaseModel):
+    role: HomeRole | None
+
+
 class AreaCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     description: str | None = None
+    home_id: int
 
 
 class AreaRead(ORMModel):
     id: int
+    home_id: int
     name: str
     description: str | None
     created_at: datetime
@@ -106,6 +153,7 @@ class TelemetryRead(ORMModel):
 
 
 class AutomationCreate(BaseModel):
+    home_id: int
     name: str = Field(min_length=2, max_length=160)
     enabled: bool = True
     trigger: dict[str, Any]
@@ -114,6 +162,7 @@ class AutomationCreate(BaseModel):
 
 class AutomationRead(ORMModel):
     id: int
+    home_id: int
     name: str
     enabled: bool
     trigger: dict[str, Any]
@@ -122,6 +171,7 @@ class AutomationRead(ORMModel):
 
 
 class AlertCreate(BaseModel):
+    home_id: int | None = None
     device_id: int | None = None
     user_id: int | None = None
     user_name: str | None = None
@@ -132,6 +182,7 @@ class AlertCreate(BaseModel):
 
 class AlertRead(ORMModel):
     id: int
+    home_id: int | None
     device_id: int | None
     user_id: int | None
     user_name: str | None

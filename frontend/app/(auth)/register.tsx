@@ -17,9 +17,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '@/src/services/api';
 import { colors } from '@/src/theme/colors';
 
-export default function LoginScreen() {
-  const [email, setEmail] = useState('admin@yolohome.vn');
-  const [password, setPassword] = useState('admin123');
+export default function RegisterScreen() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,10 +29,11 @@ export default function LoginScreen() {
     setLoading(true);
     setError('');
     try {
-      await api.login(email.trim(), password);
-      router.replace('/(tabs)');
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Đăng nhập thất bại');
+      await api.register({ name: name.trim(), email: email.trim(), password });
+      // Sau khi đăng ký thành công, điều hướng về trang đăng nhập
+      router.replace('/(auth)/login');
+    } catch (reason: any) {
+      setError(reason.message || 'Đăng ký thất bại');
     } finally {
       setLoading(false);
     }
@@ -47,14 +49,29 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={styles.glow} />
-          <View style={styles.logo}>
-            <Ionicons color={colors.primary} name="settings-outline" size={34} />
+          <View style={styles.header}>
+            <Pressable onPress={() => router.back()} style={styles.backButton}>
+              <Ionicons color={colors.primary} name="arrow-back" size={24} />
+            </Pressable>
+            <View style={styles.logo}>
+              <Ionicons color={colors.primary} name="person-add-outline" size={28} />
+            </View>
           </View>
-          <Text style={styles.title}>Home Smart</Text>
-          <Text style={styles.subtitle}>Control your environment, calmly.</Text>
+          
+          <Text style={styles.title}>Tạo tài khoản</Text>
+          <Text style={styles.subtitle}>Bắt đầu trải nghiệm nhà thông minh</Text>
 
           <View style={styles.form}>
-            <Text style={styles.label}>Địa chỉ email</Text>
+            <Text style={styles.label}>Họ và tên</Text>
+            <TextInput
+              onChangeText={setName}
+              placeholder="Nguyễn Văn A"
+              placeholderTextColor={colors.textSubtle}
+              style={styles.input}
+              value={name}
+            />
+
+            <Text style={[styles.label, styles.marginTop]}>Địa chỉ email</Text>
             <TextInput
               autoCapitalize="none"
               autoComplete="email"
@@ -66,10 +83,9 @@ export default function LoginScreen() {
               value={email}
             />
 
-            <Text style={[styles.label, styles.passwordLabel]}>Mật khẩu</Text>
+            <Text style={[styles.label, styles.marginTop]}>Mật khẩu</Text>
             <View style={styles.passwordInput}>
               <TextInput
-                autoComplete="current-password"
                 onChangeText={setPassword}
                 placeholder="••••••••"
                 placeholderTextColor={colors.textSubtle}
@@ -89,34 +105,23 @@ export default function LoginScreen() {
               </Pressable>
             </View>
 
-            <Pressable style={styles.forgot}>
-              <Text style={styles.link}>Quên mật khẩu?</Text>
-            </Pressable>
-
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Pressable
-              disabled={loading || !email || !password}
+              disabled={loading || !email || !password || !name}
               onPress={submit}
               style={({ pressed }) => [
                 styles.button,
                 pressed && styles.buttonPressed,
-                (loading || !email || !password) && styles.buttonDisabled,
+                (loading || !email || !password || !name) && styles.buttonDisabled,
               ]}>
               {loading ? (
                 <ActivityIndicator color={colors.surface} />
               ) : (
-                <Text style={styles.buttonText}>ĐĂNG NHẬP</Text>
+                <Text style={styles.buttonText}>ĐĂNG KÝ</Text>
               )}
             </Pressable>
           </View>
-
-          <Text style={styles.footer}>
-            Người dùng mới?{' '}
-            <Text style={styles.link} onPress={() => router.push('/(auth)/register')}>
-              Tạo tài khoản
-            </Text>
-          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -129,31 +134,45 @@ const styles = StyleSheet.create({
   screen: {
     flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 24,
     paddingVertical: 36,
     backgroundColor: colors.background,
-    overflow: 'hidden',
   },
   glow: {
     position: 'absolute',
     right: -100,
-    bottom: -80,
+    top: -50,
     width: 260,
     height: 260,
     borderRadius: 130,
     backgroundColor: colors.primarySoft,
     opacity: 0.7,
   },
+  header: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
   logo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primaryLight,
   },
   title: {
+    alignSelf: 'flex-start',
     marginTop: 18,
     color: colors.text,
     fontSize: 32,
@@ -161,10 +180,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.8,
   },
-  subtitle: { marginTop: 4, color: colors.textMuted, fontSize: 15 },
+  subtitle: { alignSelf: 'flex-start', marginTop: 4, color: colors.textMuted, fontSize: 15 },
   form: { width: '100%', maxWidth: 390, marginTop: 42 },
   label: { marginLeft: 8, marginBottom: 8, color: colors.textMuted, fontSize: 14, fontWeight: '600' },
-  passwordLabel: { marginTop: 22 },
+  marginTop: { marginTop: 22 },
   input: {
     height: 58,
     paddingHorizontal: 24,
@@ -182,11 +201,10 @@ const styles = StyleSheet.create({
   },
   passwordText: { flex: 1, paddingLeft: 24, color: colors.text, fontSize: 16 },
   eyeButton: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center' },
-  forgot: { alignSelf: 'flex-end', paddingVertical: 16 },
-  link: { color: colors.primary, fontWeight: '700' },
-  error: { color: colors.danger, marginBottom: 10, textAlign: 'center' },
+  error: { color: colors.danger, marginTop: 10, textAlign: 'center' },
   button: {
     height: 58,
+    marginTop: 32,
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
@@ -195,5 +213,4 @@ const styles = StyleSheet.create({
   buttonPressed: { backgroundColor: colors.primaryPressed },
   buttonDisabled: { opacity: 0.55 },
   buttonText: { color: colors.surface, fontWeight: '700', letterSpacing: 1.2 },
-  footer: { marginTop: 42, color: colors.textMuted, fontSize: 14 },
 });

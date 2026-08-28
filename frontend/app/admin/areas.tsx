@@ -5,30 +5,56 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppScreen } from '@/components/common/AppScreen';
 import { SurfaceCard } from '@/components/common/SurfaceCard';
-import { demoAreas } from '@/src/data/demo';
 import { api } from '@/src/services/api';
 import { colors } from '@/src/theme/colors';
+import { useHome } from '@/src/context/HomeContext';
+import type { Area } from '@/src/types/domain';
+import { useEffect } from 'react';
 
 export default function AreasScreen() {
-  const [areas, setAreas] = useState(demoAreas);
+  const { activeHome } = useHome();
+  const [areas, setAreas] = useState<Area[]>([]);
   const [name, setName] = useState('');
 
+  const fetchAreas = () => {
+    if (activeHome) {
+      console.log('[DEBUG] Fetching areas for home:', activeHome.id);
+      api.areas(activeHome.id)
+        .then(res => {
+          console.log('[DEBUG] Fetched areas length:', res?.length);
+          console.log('[DEBUG] Fetched areas data:', res);
+          setAreas(res);
+        })
+        .catch(err => {
+          console.error('[DEBUG] Error fetching areas:', err);
+        });
+    } else {
+      console.log('[DEBUG] activeHome is undefined in areas.tsx');
+    }
+  };
+
+  useEffect(() => {
+    fetchAreas();
+  }, [activeHome]);
+
   const addArea = async () => {
-    if (!name.trim()) return;
-    const fallback = {
-      id: Date.now(),
-      name: name.trim(),
-      description: 'Khu vực mới',
-      created_at: new Date().toISOString(),
-    };
-    const area = await api.createArea({ name: name.trim() }).catch(() => fallback);
-    setAreas((items) => [...items, area]);
-    setName('');
+    if (!name.trim() || !activeHome) return;
+    try {
+      await api.createArea({ name: name.trim(), home_id: activeHome.id });
+      fetchAreas();
+      setName('');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const removeArea = async (areaId: number) => {
-    setAreas((items) => items.filter((item) => item.id !== areaId));
-    await api.deleteArea(areaId).catch(() => undefined);
+    try {
+      await api.deleteArea(areaId);
+      fetchAreas();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -61,7 +87,7 @@ export default function AreasScreen() {
             <View style={styles.icon}>
               <Ionicons
                 color={colors.primary}
-                name={['tv-outline', 'bed-outline', 'restaurant-outline', 'lock-closed-outline'][index] as never}
+                name={(['tv-outline', 'bed-outline', 'restaurant-outline', 'lock-closed-outline'][index % 4]) as never}
                 size={23}
               />
             </View>

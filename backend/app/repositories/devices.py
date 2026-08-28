@@ -1,14 +1,17 @@
 from sqlalchemy import func, select
 
-from app.models import Device, DeviceType, DeviceCategory
+from app.models import Device, DeviceType, DeviceCategory, Area
 from app.repositories.base import Repository
 
 
 class DeviceRepository(Repository[Device]):
-    async def list(self, area_id: int | None = None) -> list[Device]:
-        statement = select(Device).order_by(Device.area_id, Device.name)
+    async def list(self, area_id: int | None = None, home_id: int | None = None) -> list[Device]:
+        statement = select(Device)
+        if home_id is not None:
+            statement = statement.join(Area, Device.area_id == Area.id).where(Area.home_id == home_id)
         if area_id is not None:
             statement = statement.where(Device.area_id == area_id)
+        statement = statement.order_by(Device.area_id, Device.name)
         result = await self.session.scalars(statement)
         return list(result)
 

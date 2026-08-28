@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.deps import CurrentUser, DatabaseSession
-from app.schemas import LoginRequest, TokenResponse, UserRead
+from app.schemas import LoginRequest, TokenResponse, UserRead, ChangePasswordRequest, UserCreate
 from app.services.auth_service import AuthService
 
 
@@ -15,9 +15,19 @@ async def login(payload: LoginRequest, session: DatabaseSession) -> TokenRespons
     return TokenResponse(access_token=token)
 
 
+@router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+async def register(payload: UserCreate, session: DatabaseSession):
+    return await AuthService(session).register(payload)
+
 @router.get("/me", response_model=UserRead)
 async def me(user: CurrentUser) -> UserRead:
     return UserRead.model_validate(user)
+
+
+@router.post("/change-password")
+async def change_password(payload: ChangePasswordRequest, user: CurrentUser, session: DatabaseSession):
+    await AuthService(session).change_password(user.id, payload.old_password, payload.new_password)
+    return {"message": "Đổi mật khẩu thành công"}
 
 
 @router.post("/login-swagger", response_model=TokenResponse, include_in_schema=False)

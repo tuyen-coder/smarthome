@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { AppHeader } from '@/components/common/AppHeader';
 import { AppScreen } from '@/components/common/AppScreen';
 import { SurfaceCard } from '@/components/common/SurfaceCard';
-import { demoAutomations } from '@/src/data/demo';
+import { useHome } from '@/src/context/HomeContext';
 import { api } from '@/src/services/api';
 import { colors } from '@/src/theme/colors';
 import type { Automation } from '@/src/types/domain';
@@ -21,20 +21,28 @@ function describe(automation: Automation) {
 }
 
 export default function AutomationsScreen() {
+  const { activeHome, isLoading: homeLoading } = useHome();
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchAutomations = () => {
-    setIsLoading(true);
-    api.automations()
-      .then(setAutomations)
-      .catch((err) => console.error('[Automations] Fetch error:', err))
-      .finally(() => setIsLoading(false));
+  const fetchAutomations = async () => {
+    if (!activeHome) return;
+    try {
+      setIsLoading(true);
+      const data = await api.automations(activeHome.id);
+      setAutomations(data);
+    } catch (err) {
+      console.error('[Automations] Fetch error:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchAutomations();
-  }, []);
+    if (!homeLoading) {
+      fetchAutomations();
+    }
+  }, [activeHome, homeLoading]);
 
   const toggle = async (automation: Automation) => {
     const enabled = !automation.enabled;

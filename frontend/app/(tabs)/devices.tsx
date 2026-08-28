@@ -9,6 +9,7 @@ import { AppScreen } from '@/components/common/AppScreen';
 import { BrightnessSlider } from '@/components/common/BrightnessSlider';
 import { SurfaceCard } from '@/components/common/SurfaceCard';
 import { api } from '@/src/services/api';
+import { useHome } from '@/src/context/HomeContext';
 import { colors } from '@/src/theme/colors';
 import type { Area, Device, DeviceType } from '@/src/types/domain';
 
@@ -33,33 +34,43 @@ function deviceStatus(device: Device) {
 }
 
 export default function DevicesScreen() {
+  const { activeHome, isLoading: homeLoading } = useHome();
   const [areas, setAreas] = useState<Area[]>([]);
-  const [allDevices, setAllDevices] = useState<Device[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [selectedArea, setSelectedArea] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Tải danh sách Khu vực khi mount
-  useEffect(() => {
-    api.areas()
-      .then(setAreas)
-      .catch((err) => console.error('[Devices] Fetch areas error:', err));
-  }, []);
+  const fetchAreas = async () => {
+    if (!activeHome) return;
+    try {
+      const data = await api.areas(activeHome.id);
+      setAreas(data);
+    } catch (err) {
+      console.error('[Devices] Fetch areas error:', err);
+    }
+  };
 
-  // 2. Tải TẤT CẢ thiết bị 1 lần duy nhất từ API (không truyền areaId lên backend)
-  const fetchDevices = useCallback(() => {
-    setIsLoading(true);
-    api.devices()
-      .then(setAllDevices)
-      .catch((err) => console.error('[Devices] Fetch devices error:', err))
-      .finally(() => setIsLoading(false));
-  }, []);
+  const fetchDevices = async () => {
+    if (!activeHome) return;
+    try {
+      const data = await api.devices(activeHome.id);
+      setDevices(data);
+    } catch (error) {
+      console.error('Fetch devices failed', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchDevices();
-  }, [fetchDevices]);
+    if (!homeLoading) {
+      fetchAreas();
+      fetchDevices();
+    }
+  }, [activeHome, homeLoading]);
 
   // 3. Tự động LỌC thiết bị ở Client theo Area và Category
-  const displayDevices = allDevices.filter((device) => {
+  const displayDevices = devices.filter((device) => {
     // Loại bỏ thiết bị loại SENSOR
     const isNotSensor = device.category?.toUpperCase() !== 'SENSOR';
     
@@ -72,18 +83,18 @@ export default function DevicesScreen() {
 
   const toggle = async (device: Device) => {
     const next = !device.is_on;
-    setAllDevices((items) =>
+    setDevices((items) =>
       items.map((item) => (item.id === device.id ? { ...item, is_on: next } : item)),
     );
     await api.commandDevice(device.id, { is_on: next }).catch(() => {
-      setAllDevices((items) =>
+      setDevices((items) =>
         items.map((item) => (item.id === device.id ? { ...item, is_on: !next } : item)),
       );
     });
   };
 
   const updateBrightness = (deviceId: number, brightness: number) => {
-    setAllDevices((items) =>
+    setDevices((items) =>
       items.map((item) =>
         item.id === deviceId
           ? { ...item, state: { ...item.state, brightness: Math.round(brightness) } }

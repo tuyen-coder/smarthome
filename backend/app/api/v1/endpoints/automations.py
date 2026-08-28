@@ -8,8 +8,8 @@ router = APIRouter()
 
 
 @router.get("", response_model=list[AutomationRead])
-async def list_automations(_: CurrentUser, session: DatabaseSession) -> list:
-    return await AutomationService(session).list()
+async def list_automations(_: CurrentUser, session: DatabaseSession, home_id: int) -> list:
+    return await AutomationService(session).list(home_id)
 
 
 @router.post("", response_model=AutomationRead, status_code=status.HTTP_201_CREATED)

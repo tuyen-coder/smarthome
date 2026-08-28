@@ -12,6 +12,9 @@ from app.models import (
     Device,
     DeviceCategory,
     DeviceType,
+    Home,
+    HomeMember,
+    HomeRole,
     Telemetry,
     User,
     UserRole,
@@ -34,22 +37,40 @@ async def init_db() -> None:
             password_hash=hash_password("admin123"),
             role=UserRole.ADMIN,
         )
+        session.add(admin)
+        await session.flush()
 
-        # 2. Tạo các Khu vực (Areas)
+        # 2. Tạo các Ngôi nhà (Homes)
+        home1 = Home(
+            name="Nhà phố Q.7", address="123 Nguyễn Văn Linh, Q.7", owner_id=admin.id
+        )
+        home2 = Home(
+            name="Căn hộ Vinhomes", address="Vinhomes Central Park, Bình Thạnh", owner_id=admin.id
+        )
+        session.add_all([home1, home2])
+        await session.flush()
+
+        # Thêm admin vào các nhà với vai trò OWNER
+        hm1 = HomeMember(user_id=admin.id, home_id=home1.id, role=HomeRole.OWNER)
+        hm2 = HomeMember(user_id=admin.id, home_id=home2.id, role=HomeRole.OWNER)
+        session.add_all([hm1, hm2])
+        await session.flush()
+
+        # 3. Tạo các Khu vực (Areas) cho home1
         living_room = Area(
-            name="Phòng Khách", description="Khu vực hệ thống đèn RGB & Máy bơm"
+            name="Phòng Khách", description="Khu vực hệ thống đèn RGB & Máy bơm", home_id=home1.id
         )
         bedroom = Area(
-            name="Phòng Ngủ", description="Khu vực nghỉ ngơi & chiếu sáng nhẹ"
+            name="Phòng Ngủ", description="Khu vực nghỉ ngơi & chiếu sáng nhẹ", home_id=home1.id
         )
         kitchen = Area(
-            name="Phòng Bếp", description="Khu vực nấu nướng & giám sát an toàn"
+            name="Phòng Bếp", description="Khu vực nấu nướng & giám sát an toàn", home_id=home1.id
         )
         garden = Area(
-            name="Sân Vườn / Ban Công", description="Khu vực tưới cây & cảm biến"
+            name="Sân Vườn / Ban Công", description="Khu vực tưới cây & cảm biến", home_id=home1.id
         )
 
-        session.add_all([admin, living_room, bedroom, kitchen, garden])
+        session.add_all([living_room, bedroom, kitchen, garden])
         await session.flush()
 
         # 3. Tạo Các Thiết Bị (Devices)
@@ -158,18 +179,21 @@ async def init_db() -> None:
                 Telemetry(device_id=humi_sensor.id, metric="humidity", value=70.5, unit="%", recorded_at=datetime(2026, 8, 27, 23, 40, 0)),
 
                 Automation(
+                    home_id=home1.id,
                     name="Tự động bật Đèn 4 khi có người lại gần",
                     enabled=True,
                     trigger={"type": "distance", "operator": "<", "value_cm": 20},
                     action={"device_id": led4.id, "mode": "auto_trigger"},
                 ),
                 Automation(
+                    home_id=home1.id,
                     name="Bật máy bơm khi nhiệt độ cao",
                     enabled=False,
                     trigger={"type": "temperature", "operator": ">", "value": 35},
                     action={"device_id": pump.id, "is_on": True},
                 ),
                 Alert(
+                    home_id=home1.id,
                     device_id=temp_sensor.id,
                     title="Nhiệt độ phòng",
                     message="Nhiệt độ hiện tại 29.5°C đang ở mức ổn định",

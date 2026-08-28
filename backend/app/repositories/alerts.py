@@ -5,8 +5,8 @@ from app.repositories.base import Repository
 
 
 class AlertRepository(Repository[Alert]):
-    async def list(self, unresolved_only: bool = False) -> list[Alert]:
-        statement = select(Alert).order_by(Alert.created_at.desc())
+    async def list(self, home_id: int, unresolved_only: bool = False) -> list[Alert]:
+        statement = select(Alert).where(Alert.home_id == home_id).order_by(Alert.created_at.desc())
         if unresolved_only:
             statement = statement.where(Alert.is_resolved.is_(False))
         result = await self.session.scalars(statement)
@@ -18,6 +18,7 @@ class AlertRepository(Repository[Alert]):
     async def create(
         self,
         *,
+        home_id: int | None,
         device_id: int | None,
         user_id: int | None = None,
         user_name: str | None = None,
@@ -26,6 +27,7 @@ class AlertRepository(Repository[Alert]):
         severity: AlertSeverity,
     ) -> Alert:
         alert = Alert(
+            home_id=home_id,
             device_id=device_id,
             user_id=user_id,
             user_name=user_name,
@@ -52,14 +54,14 @@ class AlertRepository(Repository[Alert]):
             alert.is_resolved = is_resolved
         return await self.commit(alert)
 
-    async def mark_all_read(self) -> None:
+    async def mark_all_read(self, home_id: int) -> None:
         from sqlalchemy import update
-        statement = update(Alert).where(Alert.is_read.is_(False)).values(is_read=True)
+        statement = update(Alert).where(Alert.home_id == home_id, Alert.is_read.is_(False)).values(is_read=True)
         await self.session.execute(statement)
         await self.session.commit()
 
-    async def unresolved_count(self) -> int:
+    async def unresolved_count(self, home_id: int) -> int:
         count = await self.session.scalar(
-            select(func.count(Alert.id)).where(Alert.is_resolved.is_(False))
+            select(func.count(Alert.id)).where(Alert.home_id == home_id, Alert.is_resolved.is_(False))
         )
         return int(count or 0)

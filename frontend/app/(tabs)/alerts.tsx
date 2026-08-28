@@ -10,6 +10,7 @@ import { SurfaceCard } from '@/components/common/SurfaceCard';
 import { demoAlerts } from '@/src/data/demo';
 import { api } from '@/src/services/api';
 import { colors } from '@/src/theme/colors';
+import { useHome } from '@/src/context/HomeContext';
 import type { AlertSeverity } from '@/src/types/domain';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -23,19 +24,27 @@ const severity: Record<AlertSeverity, { icon: IconName; color: string; soft: str
 import { realtime } from '@/src/services/realtime';
 
 export default function AlertsScreen() {
+  const { activeHome, isLoading: homeLoading } = useHome();
   const [alerts, setAlerts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchAlerts = () => {
-    setIsLoading(true);
-    api.alerts()
-      .then(setAlerts)
-      .catch((err) => console.error('[Alerts] Fetch error:', err))
-      .finally(() => setIsLoading(false));
+  const fetchAlerts = async () => {
+    if (!activeHome) return;
+    try {
+      setIsLoading(true);
+      const data = await api.alerts(activeHome.id);
+      setAlerts(data);
+    } catch (err) {
+      console.error('[Alerts] Fetch error:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchAlerts();
+    if (!homeLoading) {
+      fetchAlerts();
+    }
     
     realtime.connect();
     const unsubscribe = realtime.subscribe((payload) => {
@@ -46,11 +55,12 @@ export default function AlertsScreen() {
     });
     
     return () => unsubscribe();
-  }, []);
+  }, [activeHome, homeLoading]);
 
   const markAll = async () => {
+    if (!activeHome) return;
     setAlerts((items) => items.map((item) => ({ ...item, is_read: true })));
-    await api.markAllAlertsRead().catch(() => {
+    await api.markAllAlertsRead(activeHome.id).catch(() => {
       // Revert if error
       fetchAlerts();
     });

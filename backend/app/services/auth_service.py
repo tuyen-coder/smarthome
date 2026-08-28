@@ -34,3 +34,14 @@ class AuthService:
 
     async def list_users(self) -> list[User]:
         return await self.users.list()
+
+    async def change_password(self, user_id: int, old_password: str, new_password: str) -> None:
+        user = await self.users.get(user_id)
+        if not user:
+            raise AuthenticationError("User not found")
+        if not verify_password(old_password, user.password_hash):
+            raise AuthenticationError("Mật khẩu cũ không chính xác")
+        
+        user.password_hash = hash_password(new_password)
+        self.users.session.add(user)
+        await self.users.session.commit()

@@ -7,27 +7,29 @@ import { AppScreen } from '@/components/common/AppScreen';
 import { SurfaceCard } from '@/components/common/SurfaceCard';
 import { api } from '@/src/services/api';
 import { colors } from '@/src/theme/colors';
-import type { UserRole } from '@/src/types/domain';
+import { useHome } from '@/src/context/HomeContext';
+import type { HomeRole } from '@/src/types/domain';
 
-const roles: { value: UserRole; title: string; description: string }[] = [
+const roles: { value: HomeRole; title: string; description: string }[] = [
   { value: 'admin', title: 'Quản trị viên', description: 'Toàn quyền điều khiển và quản lý người dùng.' },
   { value: 'member', title: 'Thành viên', description: 'Điều khiển thiết bị nhưng không thể thay đổi cài đặt.' },
   { value: 'guest', title: 'Khách', description: 'Truy cập tạm thời trong khoảng thời gian nhất định.' },
 ];
 
 export default function NewUserScreen() {
-  const [name, setName] = useState('');
+  const { activeHome } = useHome();
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<UserRole>('member');
+  const [role, setRole] = useState<HomeRole>('member');
   const [error, setError] = useState('');
 
   const submit = async () => {
+    if (!activeHome) return;
     setError('');
     try {
-      await api.createUser({ name, email, role, password: 'changeme123' });
+      await api.addHomeMember(activeHome.id, { email, role });
       router.back();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Không thể thêm người dùng');
+    } catch (reason: any) {
+      setError(reason.message || 'Không thể thêm thành viên (người dùng phải tồn tại trong hệ thống)');
     }
   };
 
@@ -46,15 +48,7 @@ export default function NewUserScreen() {
       </View>
       <Text style={styles.photoLabel}>Tải ảnh đại diện</Text>
 
-      <Text style={styles.label}>Họ và tên</Text>
-      <TextInput
-        onChangeText={setName}
-        placeholder="Nguyễn Văn A"
-        placeholderTextColor={colors.textSubtle}
-        style={styles.input}
-        value={name}
-      />
-      <Text style={styles.label}>Địa chỉ Email</Text>
+      <Text style={styles.label}>Địa chỉ Email thành viên</Text>
       <TextInput
         autoCapitalize="none"
         keyboardType="email-address"
@@ -89,11 +83,11 @@ export default function NewUserScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable
-        disabled={!name.trim() || !email.trim()}
+        disabled={!email.trim()}
         onPress={submit}
-        style={[styles.submit, (!name.trim() || !email.trim()) && styles.disabled]}>
+        style={[styles.submit, !email.trim() && styles.disabled]}>
         <Ionicons color={colors.surface} name="person-add-outline" size={19} />
-        <Text style={styles.submitText}>Thêm người dùng</Text>
+        <Text style={styles.submitText}>Thêm thành viên</Text>
       </Pressable>
     </AppScreen>
   );

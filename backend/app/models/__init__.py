@@ -13,7 +13,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -23,6 +23,13 @@ def utc_now() -> datetime:
 
 
 class UserRole(StrEnum):
+    ADMIN = "admin"
+    MEMBER = "member"
+    GUEST = "guest"
+
+
+class HomeRole(StrEnum):
+    OWNER = "owner"
     ADMIN = "admin"
     MEMBER = "member"
     GUEST = "guest"
@@ -67,11 +74,46 @@ class User(Base):
     )
 
 
+class Home(Base):
+    __tablename__ = "homes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
+class HomeMember(Base):
+    __tablename__ = "home_members"
+    __table_args__ = (UniqueConstraint("user_id", "home_id", name="uq_user_home"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    home_id: Mapped[int] = mapped_column(
+        ForeignKey("homes.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[HomeRole] = mapped_column(Enum(HomeRole), default=HomeRole.MEMBER)
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    user: Mapped["User"] = relationship(lazy="joined")
+
+
 class Area(Base):
     __tablename__ = "areas"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(120), unique=True)
+    home_id: Mapped[int] = mapped_column(
+        ForeignKey("homes.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(120))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
@@ -128,6 +170,9 @@ class Automation(Base):
     __tablename__ = "automations"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    home_id: Mapped[int] = mapped_column(
+        ForeignKey("homes.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(160))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     trigger: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -141,6 +186,9 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    home_id: Mapped[int | None] = mapped_column(
+        ForeignKey("homes.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     device_id: Mapped[int | None] = mapped_column(
         ForeignKey("devices.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -202,6 +250,9 @@ __all__ = [
     "Device",
     "DeviceCategory",
     "DeviceType",
+    "Home",
+    "HomeMember",
+    "HomeRole",
     "Telemetry",
     "User",
     "UserRole",

@@ -10,8 +10,8 @@ class AutomationService:
     def __init__(self, session: AsyncSession) -> None:
         self.automations = AutomationRepository(session)
 
-    async def list(self) -> list[Automation]:
-        return await self.automations.list()
+    async def list(self, home_id: int) -> list[Automation]:
+        return await self.automations.list(home_id=home_id)
 
     async def create(self, payload: AutomationCreate) -> Automation:
         return await self.automations.create(**payload.model_dump())

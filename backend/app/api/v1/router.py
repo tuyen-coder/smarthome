@@ -6,6 +6,7 @@ from app.api.v1.endpoints import (
     auth,
     automations,
     devices,
+    homes,
     telemetry,
     users,
 )
@@ -13,6 +14,7 @@ from app.api.v1.endpoints import (
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(homes.router, prefix="/homes", tags=["homes"])
 api_router.include_router(areas.router, prefix="/areas", tags=["areas"])
 api_router.include_router(devices.router, prefix="/devices", tags=["devices"])
 api_router.include_router(telemetry.router, prefix="/telemetry", tags=["telemetry"])

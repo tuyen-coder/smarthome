@@ -26,5 +26,5 @@ async def record_telemetry(
 
 
 @router.get("/dashboard", response_model=DashboardSummary)
-async def dashboard(_: CurrentUser, session: DatabaseSession) -> DashboardSummary:
-    return await StatisticsService(session).dashboard()
+async def dashboard(_: CurrentUser, session: DatabaseSession, home_id: int) -> DashboardSummary:
+    return await StatisticsService(session).dashboard(home_id)

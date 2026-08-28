@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import desc, select
 
-from app.models import Telemetry
+from app.models import Telemetry, Device, Area
 from app.repositories.base import Repository
 
 
@@ -22,10 +22,12 @@ class TelemetryRepository(Repository[Telemetry]):
         result = await self.session.scalars(statement)
         return list(result)
 
-    async def latest_metric(self, metric: str) -> Telemetry | None:
+    async def latest_metric(self, metric: str, home_id: int) -> Telemetry | None:
         return await self.session.scalar(
             select(Telemetry)
-            .where(Telemetry.metric == metric)
+            .join(Device, Telemetry.device_id == Device.id)
+            .join(Area, Device.area_id == Area.id)
+            .where(Telemetry.metric == metric, Area.home_id == home_id)
             .order_by(desc(Telemetry.recorded_at))
             .limit(1)
         )

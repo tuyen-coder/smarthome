@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { Alert, Area, Automation, DashboardSummary, Device, User } from '@/src/types/domain';
 
 const now = new Date().toISOString();

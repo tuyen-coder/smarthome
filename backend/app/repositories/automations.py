@@ -5,9 +5,9 @@ from app.repositories.base import Repository
 
 
 class AutomationRepository(Repository[Automation]):
-    async def list(self) -> list[Automation]:
+    async def list(self, home_id: int) -> list[Automation]:
         result = await self.session.scalars(
-            select(Automation).order_by(Automation.name)
+            select(Automation).where(Automation.home_id == home_id).order_by(Automation.name)
         )
         return list(result)
 
@@ -17,12 +17,14 @@ class AutomationRepository(Repository[Automation]):
     async def create(
         self,
         *,
+        home_id: int,
         name: str,
         enabled: bool,
         trigger: dict[str, object],
         action: dict[str, object],
     ) -> Automation:
         automation = Automation(
+            home_id=home_id,
             name=name,
             enabled=enabled,
             trigger=trigger,

@@ -5,29 +5,55 @@ import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { AppScreen } from '@/components/common/AppScreen';
 import { SurfaceCard } from '@/components/common/SurfaceCard';
-import { demoAreas, demoUsers } from '@/src/data/demo';
 import { api } from '@/src/services/api';
 import { colors } from '@/src/theme/colors';
+import { useHome } from '@/src/context/HomeContext';
+import type { HomeMember, Area } from '@/src/types/domain';
+import { useEffect } from 'react';
 
 type PermissionState = Record<number, { can_view: boolean; can_control: boolean }>;
 
 export default function PermissionsScreen() {
-  const [selectedUser, setSelectedUser] = useState(demoUsers[1].id);
-  const [permissions, setPermissions] = useState<PermissionState>(() =>
-    Object.fromEntries(
-      demoAreas.map((area, index) => [
-        area.id,
-        { can_view: index < 3, can_control: index < 2 },
-      ]),
-    ),
-  );
+  const { activeHome } = useHome();
+  const [members, setMembers] = useState<HomeMember[]>([]);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [selectedUser, setSelectedUser] = useState<number | null>(null);
+  const [permissions, setPermissions] = useState<PermissionState>({});
+
+  useEffect(() => {
+    if (activeHome) {
+      api.homeMembers(activeHome.id).then(data => {
+        // Lọc ra các thành viên không phải owner
+        const nonOwners = data.filter(m => m.role !== 'owner');
+        setMembers(nonOwners);
+        if (nonOwners.length > 0 && selectedUser === null) {
+          setSelectedUser(nonOwners[0].user_id);
+        }
+      });
+      api.areas(activeHome.id).then(setAreas);
+    }
+  }, [activeHome]);
+
+  useEffect(() => {
+    if (activeHome && selectedUser) {
+      api.getPermissions(activeHome.id, selectedUser).then((perms) => {
+        const nextState: PermissionState = {};
+        for (const p of perms) {
+          nextState[p.area_id] = { can_view: p.can_view, can_control: p.can_control };
+        }
+        setPermissions(nextState);
+      });
+    }
+  }, [activeHome, selectedUser]);
 
   const update = async (
     areaId: number,
     field: 'can_view' | 'can_control',
     value: boolean,
   ) => {
-    const next = { ...permissions[areaId], [field]: value };
+    if (!selectedUser) return;
+    const currentPerm = permissions[areaId] || { can_view: false, can_control: false };
+    const next = { ...currentPerm, [field]: value };
     if (field === 'can_view' && !value) next.can_control = false;
     if (field === 'can_control' && value) next.can_view = true;
     setPermissions((current) => ({ ...current, [areaId]: next }));
@@ -45,18 +71,18 @@ export default function PermissionsScreen() {
 
       <Text style={styles.sectionTitle}>CHỌN THÀNH VIÊN</Text>
       <View style={styles.userChips}>
-        {demoUsers.slice(1).map((user) => (
+        {members.map((member) => (
           <Pressable
-            key={user.id}
-            onPress={() => setSelectedUser(user.id)}
-            style={[styles.userChip, selectedUser === user.id && styles.selectedUser]}>
+            key={member.id}
+            onPress={() => setSelectedUser(member.user_id)}
+            style={[styles.userChip, selectedUser === member.user_id && styles.selectedUser]}>
             <Ionicons
-              color={selectedUser === user.id ? colors.surface : colors.primary}
+              color={selectedUser === member.user_id ? colors.surface : colors.primary}
               name="person-outline"
               size={18}
             />
-            <Text style={[styles.userName, selectedUser === user.id && styles.selectedUserText]}>
-              {user.name.split(' ').slice(-2).join(' ')}
+            <Text style={[styles.userName, selectedUser === member.user_id && styles.selectedUserText]}>
+              {member.user.name.split(' ').slice(-2).join(' ')}
             </Text>
           </Pressable>
         ))}
@@ -64,8 +90,8 @@ export default function PermissionsScreen() {
 
       <Text style={styles.sectionTitle}>QUYỀN THEO KHU VỰC</Text>
       <View style={styles.list}>
-        {demoAreas.map((area) => {
-          const permission = permissions[area.id];
+        {areas.map((area) => {
+          const permission = permissions[area.id] || { can_view: false, can_control: false };
           return (
             <SurfaceCard key={area.id}>
               <View style={styles.areaHeader}>

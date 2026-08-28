@@ -1,4 +1,5 @@
 export type UserRole = 'admin' | 'member' | 'guest';
+export type HomeRole = 'owner' | 'admin' | 'member' | 'guest';
 export type DeviceCategory = 'SENSOR' | 'ACTUATOR' | 'HYBRID';
 export type DeviceType =
   | 'light'
@@ -19,8 +20,26 @@ export interface User {
   created_at: string;
 }
 
+export interface Home {
+  id: number;
+  name: string;
+  address?: string | null;
+  owner_id: number;
+  created_at: string;
+}
+
+export interface HomeMember {
+  id: number;
+  user_id: number;
+  home_id: number;
+  role: HomeRole;
+  joined_at: string;
+  user: User;
+}
+
 export interface Area {
   id: number;
+  home_id: number;
   name: string;
   description?: string | null;
   created_at: string;
@@ -49,6 +68,7 @@ export interface Device {
 
 export interface Automation {
   id: number;
+  home_id: number;
   name: string;
   enabled: boolean;
   trigger: Record<string, unknown>;
@@ -58,6 +78,7 @@ export interface Automation {
 
 export interface Alert {
   id: number;
+  home_id?: number | null;
   device_id?: number | null;
   title: string;
   message: string;

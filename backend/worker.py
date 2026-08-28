@@ -20,6 +20,7 @@ async def process_device_activity(payload_str: str):
         is_on = data.get("is_on")
         user_id = data.get("user_id")
         user_name = data.get("user_name")
+        home_id = data.get("home_id")
         
         # Chỉ xử lý nếu category khác SENSOR
         if category and category.lower() != DeviceCategory.SENSOR.value:
@@ -31,6 +32,7 @@ async def process_device_activity(payload_str: str):
                 try:
                     alert_service = AlertService(session)
                     alert_payload = AlertCreate(
+                        home_id=home_id,
                         device_id=device_id,
                         user_id=user_id,
                         user_name=user_name,

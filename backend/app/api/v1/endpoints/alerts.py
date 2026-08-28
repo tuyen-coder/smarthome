@@ -13,9 +13,10 @@ router = APIRouter()
 async def list_alerts(
     _: CurrentUser,
     session: DatabaseSession,
+    home_id: int,
     unresolved_only: bool = False,
 ) -> list:
-    return await AlertService(session).list(unresolved_only)
+    return await AlertService(session).list(home_id, unresolved_only)
 
 
 @router.post("", response_model=AlertRead, status_code=status.HTTP_201_CREATED)
@@ -37,6 +38,7 @@ async def update_alert(
 async def mark_all_alerts_read(
     _: CurrentUser,
     session: DatabaseSession,
+    home_id: int,
 ):
-    await AlertService(session).mark_all_read()
+    await AlertService(session).mark_all_read(home_id)
     return {"status": "success"}
