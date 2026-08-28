@@ -5,11 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import EntityNotFoundError, PermissionDeniedError
 from app.core.redis import redis_client
 from app.integrations.mqtt.client import mqtt_client
-from app.models import Device, DeviceCategory, User, Area
+from app.models import Device, DeviceCategory, DeviceType, User, Area, HomeRole, UserRole
 from app.realtime.manager import manager
 from app.repositories.areas import AreaRepository
 from app.repositories.devices import DeviceRepository
-from app.schemas import DeviceCommand, DeviceCreate
+from app.schemas import DeviceCommand, DeviceCreate, DeviceUpdate
 from app.services.permission_service import PermissionService
 
 
@@ -21,12 +21,21 @@ class DeviceService:
         self.permissions = PermissionService(session)
 
     async def list(self, user: User, home_id: int, area_id: int | None = None) -> list[Device]:
-        # User needs to be in home_id
         await self.permissions.home_service.get_home(user, home_id)
-        # Note: if area_id is provided, we should probably check if area_id belongs to home_id,
-        # but the repository query joins with Area.home_id == home_id so it's safe.
         devices = await self.devices.list(area_id=area_id, home_id=home_id)
-        return devices
+        visible: list[Device] = []
+        for dev in devices:
+            if await self.permissions.can_access(user, dev.area_id, control=False):
+                visible.append(dev)
+        return visible
+
+    async def get(self, user: User, device_id: int) -> Device:
+        device = await self.devices.get(device_id)
+        if device is None:
+            raise EntityNotFoundError("Không tìm thấy thiết bị")
+        if not await self.permissions.can_access(user, device.area_id, control=False):
+            raise PermissionDeniedError("Bạn không có quyền xem thiết bị này")
+        return device
 
     async def create(self, payload: DeviceCreate) -> Device:
         if await self.areas.get(payload.area_id) is None:
@@ -39,6 +48,56 @@ class DeviceService:
             feed_key=payload.feed_key,
             state=payload.state,
         )
+
+    async def update(self, user: User, device_id: int, payload: DeviceUpdate) -> Device:
+        device = await self.devices.get(device_id)
+        if device is None:
+            raise EntityNotFoundError("Không tìm thấy thiết bị")
+
+        area = await self.areas.get(device.area_id)
+        if not area:
+            raise EntityNotFoundError("Không tìm thấy khu vực của thiết bị")
+
+        home = await self.permissions.home_service.homes.get(area.home_id)
+        member = await self.permissions.home_service.members.get(area.home_id, user.id)
+        is_owner = home and home.owner_id == user.id
+        is_admin = member and member.role in [HomeRole.OWNER, HomeRole.ADMIN]
+
+        if not is_owner and not is_admin and user.role != UserRole.ADMIN:
+            raise PermissionDeniedError("Chỉ chủ nhà hoặc quản trị viên mới có quyền chỉnh sửa thiết bị")
+
+        if payload.area_id is not None and payload.area_id != device.area_id:
+            target_area = await self.areas.get(payload.area_id)
+            if not target_area or target_area.home_id != area.home_id:
+                raise EntityNotFoundError("Khu vực mới không hợp lệ hoặc không thuộc ngôi nhà này")
+
+        return await self.devices.update(
+            device,
+            name=payload.name,
+            category=payload.category,
+            device_type=payload.type,
+            area_id=payload.area_id,
+            feed_key=payload.feed_key,
+        )
+
+    async def delete(self, user: User, device_id: int) -> None:
+        device = await self.devices.get(device_id)
+        if device is None:
+            raise EntityNotFoundError("Không tìm thấy thiết bị")
+
+        area = await self.areas.get(device.area_id)
+        if not area:
+            raise EntityNotFoundError("Không tìm thấy khu vực của thiết bị")
+
+        home = await self.permissions.home_service.homes.get(area.home_id)
+        member = await self.permissions.home_service.members.get(area.home_id, user.id)
+        is_owner = home and home.owner_id == user.id
+        is_admin = member and member.role in [HomeRole.OWNER, HomeRole.ADMIN]
+
+        if not is_owner and not is_admin and user.role != UserRole.ADMIN:
+            raise PermissionDeniedError("Chỉ chủ nhà hoặc quản trị viên mới có quyền xóa thiết bị")
+
+        await self.devices.delete(device)
 
     async def command(
         self, user: User, device_id: int, payload: DeviceCommand
@@ -64,16 +123,25 @@ class DeviceService:
             # Gọi phương thức publish đồng bộ an toàn
             mqtt_client.publish(device.feed_key, mqtt_payload)
 
-        # Phát thông báo WebSocket thời gian thực cho App
-        await manager.broadcast({
-            "type": "device.updated", 
-            "device_id": device.id,
-            "is_on": device.is_on,
-            "state": device.state
-        })
-        
-        # Lấy home_id từ Area để truyền cho Worker
+        # Lấy home_id từ Area
         area = await self.session.get(Area, device.area_id)
+        
+        # Phát thông báo WebSocket thời gian thực cho các user đang mở ngôi nhà này
+        if area:
+            await manager.broadcast_to_home(area.home_id, {
+                "type": "device.updated", 
+                "home_id": area.home_id,
+                "device_id": device.id,
+                "is_on": device.is_on,
+                "state": device.state
+            })
+        else:
+            await manager.broadcast({
+                "type": "device.updated", 
+                "device_id": device.id,
+                "is_on": device.is_on,
+                "state": device.state
+            })
         
         # --- Đẩy sự kiện vào Redis (Worker xử lý Alert) ---
         activity_event = {

@@ -35,7 +35,12 @@ async def redis_subscriber():
         if message["type"] == "message":
             try:
                 data = json.loads(message["data"])
-                await manager.broadcast(data)
+                if isinstance(data, dict) and data.get("home_id") is not None:
+                    await manager.broadcast_to_home(data["home_id"], data)
+                elif isinstance(data, dict) and data.get("user_id") is not None:
+                    await manager.send_personal_message(data["user_id"], data)
+                else:
+                    await manager.broadcast(data)
             except Exception as e:
                 print(f"Error broadcasting message: {e}")
 

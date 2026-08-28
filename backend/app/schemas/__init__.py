@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models import AlertSeverity, DeviceType, DeviceCategory, UserRole, HomeRole
 from enum import Enum
@@ -116,6 +116,42 @@ class DeviceCreate(BaseModel):
     area_id: int
     feed_key: str | None = None
     state: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.lower()
+        return v
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def normalize_type(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.lower()
+        return v
+
+
+class DeviceUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    category: DeviceCategory | None = None
+    type: DeviceType | None = None
+    area_id: int | None = None
+    feed_key: str | None = None
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.lower()
+        return v
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def normalize_type(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.lower()
+        return v
 
 
 class DeviceRead(ORMModel):

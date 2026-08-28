@@ -57,7 +57,11 @@ export default function PermissionsScreen() {
     if (field === 'can_view' && !value) next.can_control = false;
     if (field === 'can_control' && value) next.can_view = true;
     setPermissions((current) => ({ ...current, [areaId]: next }));
-    await api.grantPermission(areaId, selectedUser, next).catch(() => undefined);
+    try {
+      await api.grantPermission(areaId, selectedUser, next);
+    } catch (err) {
+      console.error('[Permissions] Grant permission error:', err);
+    }
   };
 
   return (

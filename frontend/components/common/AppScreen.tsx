@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import type { RefreshControlProps, StyleProp, ViewStyle } from 'react-native';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,15 +8,16 @@ import { colors } from '@/src/theme/colors';
 type Props = {
   children: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
-  style?: StyleProp<ViewStyle>; // 1. Thêm style vào Props
+  style?: StyleProp<ViewStyle>;
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 };
 
-// 2. Nhận prop style
-export function AppScreen({ children, contentStyle, style }: Props) {
+export function AppScreen({ children, contentStyle, style, refreshControl }: Props) {
   return (
     <SafeAreaView edges={['top']} style={[styles.safeArea, style]}>
       <ScrollView
         contentContainerStyle={[styles.content, contentStyle]}
+        refreshControl={refreshControl}
         showsVerticalScrollIndicator={false}>
         {children}
       </ScrollView>

@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader } from '@/components/common/AppHeader';
 import { AppScreen } from '@/components/common/AppScreen';
@@ -37,17 +37,17 @@ function MetricCard({
 }
 
 export default function DashboardScreen() {
-  const { activeHome, isLoading: homeLoading } = useHome();
+  const { activeHome, refreshHomes, isLoading: homeLoading } = useHome();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Tải dữ liệu ban đầu từ API
   const fetchData = async () => {
     if (!activeHome) return;
     try {
-      setIsLoading(true);
       const [nextSummary, nextAreas] = await Promise.all([
         api.dashboard(activeHome.id),
         api.areas(activeHome.id),
@@ -60,6 +60,12 @@ export default function DashboardScreen() {
       setIsLoading(false);
     }
   };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchData(), refreshHomes()]);
+    setRefreshing(false);
+  };
   
   useEffect(() => {
     if (!homeLoading) {
@@ -70,6 +76,16 @@ export default function DashboardScreen() {
     realtime.connect();
 
     const unsubscribe = realtime.subscribe((payload) => {
+      if (
+        payload.type === 'permission.updated' ||
+        payload.type === 'member.role_updated' ||
+        payload.type === 'device.updated'
+      ) {
+        fetchData();
+        refreshHomes();
+        return;
+      }
+
       if (payload.type === 'DEVICE_UPDATE') {
         const feedKey = payload.feed_key as string | undefined;
         const val = payload.value;
@@ -100,7 +116,7 @@ export default function DashboardScreen() {
     };
   }, [activeHome, homeLoading]);
 
-  if (homeLoading || isLoading) {
+  if (homeLoading || (isLoading && !summary)) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -117,7 +133,15 @@ export default function DashboardScreen() {
   }
 
   return (
-    <AppScreen>
+    <AppScreen
+      refreshControl={
+        <RefreshControl
+          colors={[colors.primary]}
+          onRefresh={onRefresh}
+          refreshing={refreshing}
+          tintColor={colors.primary}
+        />
+      }>
       <AppHeader />
       <View style={styles.metrics}>
         <MetricCard

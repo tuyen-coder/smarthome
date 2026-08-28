@@ -1,5 +1,5 @@
-// app/services/realtime.ts (hoặc file hiện tại của bạn)
 import { env } from '@/src/config/env';
+import { getAccessToken } from '@/src/services/api';
 
 type RealtimePayload = {
   type: string;
@@ -13,18 +13,41 @@ class RealtimeService {
   private listeners = new Set<Listener>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private isExplicitlyClosed = false;
+  private currentHomeId: number | null = null;
 
-  connect() {
+  connect(homeId?: number) {
+    if (homeId !== undefined) {
+      this.currentHomeId = homeId;
+    }
+
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+      if (homeId && this.socket.readyState === WebSocket.OPEN) {
+        this.socket.send(JSON.stringify({ type: 'switch_home', home_id: homeId }));
+      }
       return;
     }
 
     this.isExplicitlyClosed = false;
-    this.socket = new WebSocket(env.WS_URL);
+    const token = getAccessToken();
+    const params: string[] = [];
+    if (token) params.push(`token=${encodeURIComponent(token)}`);
+    if (this.currentHomeId) params.push(`home_id=${encodeURIComponent(String(this.currentHomeId))}`);
+
+    const wsUrl = `${env.WS_URL}${params.length > 0 ? '?' + params.join('&') : ''}`;
+    this.socket = new WebSocket(wsUrl);
 
     this.socket.onopen = () => {
-      console.log('[WS] Connected successfully');
-      this.socket?.send('mobile-connected');
+      console.log('[WS] Connected to realtime gateway');
+      const curToken = getAccessToken();
+      if (curToken) {
+        this.socket?.send(
+          JSON.stringify({
+            type: 'authenticate',
+            token: curToken,
+            home_id: this.currentHomeId,
+          })
+        );
+      }
     };
 
     this.socket.onmessage = (event) => {
@@ -39,7 +62,6 @@ class RealtimeService {
     this.socket.onclose = () => {
       console.log('[WS] Disconnected');
       this.socket = null;
-      // Tự động thử kết nối lại sau 3 giây nếu không phải do app chủ động ngắt
       if (!this.isExplicitlyClosed) {
         this.scheduleReconnect();
       }
@@ -49,6 +71,15 @@ class RealtimeService {
       console.error('[WS Error]', error);
       this.socket?.close();
     };
+  }
+
+  setHome(homeId: number) {
+    this.currentHomeId = homeId;
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type: 'switch_home', home_id: homeId }));
+    } else {
+      this.connect(homeId);
+    }
   }
 
   private scheduleReconnect() {
@@ -68,7 +99,6 @@ class RealtimeService {
 
   subscribe(listener: Listener) {
     this.listeners.add(listener);
-    // Hàm unsubcribe trả về khi dọn dẹp effect
     return () => {
       this.listeners.delete(listener);
     };

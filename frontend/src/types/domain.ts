@@ -1,6 +1,6 @@
 export type UserRole = 'admin' | 'member' | 'guest';
 export type HomeRole = 'owner' | 'admin' | 'member' | 'guest';
-export type DeviceCategory = 'SENSOR' | 'ACTUATOR' | 'HYBRID';
+export type DeviceCategory = 'sensor' | 'actuator' | 'hybrid';
 export type DeviceType =
   | 'light'
   | 'climate'

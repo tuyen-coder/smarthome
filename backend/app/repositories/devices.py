@@ -39,6 +39,32 @@ class DeviceRepository(Repository[Device]):
         self.session.add(device)
         return await self.commit(device)
 
+    async def update(
+        self,
+        device: Device,
+        *,
+        name: str | None = None,
+        category: DeviceCategory | None = None,
+        device_type: DeviceType | None = None,
+        area_id: int | None = None,
+        feed_key: str | None = None,
+    ) -> Device:
+        if name is not None:
+            device.name = name
+        if category is not None:
+            device.category = category
+        if device_type is not None:
+            device.type = device_type
+        if area_id is not None:
+            device.area_id = area_id
+        if feed_key is not None:
+            device.feed_key = feed_key
+        return await self.commit(device)
+
+    async def delete(self, device: Device) -> None:
+        await self.session.delete(device)
+        await self.session.commit()
+
     async def update_state(
         self, device: Device, *, is_on: bool | None, state: dict[str, object]
     ) -> Device:

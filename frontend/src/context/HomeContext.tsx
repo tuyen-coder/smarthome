@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { api } from '@/src/services/api';
+import { realtime } from '@/src/services/realtime';
 import type { Home } from '@/src/types/domain';
 
 interface HomeContextData {
@@ -58,6 +59,7 @@ export function HomeProvider({ children }: { children: React.ReactNode }) {
       }
       
       if (matchedHome) {
+        realtime.setHome(matchedHome.id);
         try {
           const roleData = await api.myRole(matchedHome.id);
           setActiveHomeRole(roleData.role);
@@ -76,11 +78,20 @@ export function HomeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     fetchHomes();
+    
+    // Nhận thông báo đích danh từ server khi quyền/vai trò của chính user này thay đổi
+    const unsub = realtime.subscribe((payload) => {
+      if (payload.type === 'member.role_updated' || payload.type === 'member.removed') {
+        fetchHomes();
+      }
+    });
+    return unsub;
   }, []);
 
   const setActiveHome = async (home: Home) => {
     setActiveHomeState(home);
     await setStorageItem(ACTIVE_HOME_KEY, home.id.toString());
+    realtime.setHome(home.id);
     try {
       const roleData = await api.myRole(home.id);
       setActiveHomeRole(roleData.role);

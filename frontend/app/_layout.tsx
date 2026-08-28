@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { colors } from '@/src/theme/colors';
 import { realtime } from '@/src/services/realtime';
 import { initAccessToken } from '@/src/services/api';
+import { HomeProvider } from '@/src/context/HomeContext';
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
@@ -38,7 +39,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <HomeProvider>
       <StatusBar backgroundColor={colors.background} style="dark" />
       <Stack
         screenOptions={{
@@ -46,6 +47,6 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.background },
         }}
       />
-    </>
+    </HomeProvider>
   );
 }

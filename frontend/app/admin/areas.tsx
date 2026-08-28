@@ -18,18 +18,12 @@ export default function AreasScreen() {
 
   const fetchAreas = () => {
     if (activeHome) {
-      console.log('[DEBUG] Fetching areas for home:', activeHome.id);
       api.areas(activeHome.id)
         .then(res => {
-          console.log('[DEBUG] Fetched areas length:', res?.length);
-          console.log('[DEBUG] Fetched areas data:', res);
           setAreas(res);
         })
         .catch(err => {
-          console.error('[DEBUG] Error fetching areas:', err);
         });
-    } else {
-      console.log('[DEBUG] activeHome is undefined in areas.tsx');
     }
   };
 

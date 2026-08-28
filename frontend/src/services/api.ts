@@ -41,6 +41,10 @@ async function deleteStorageItem(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(key);
 }
 
+export function getAccessToken(): string {
+  return accessToken;
+}
+
 // Khôi phục token từ bộ nhớ khi mở App
 export async function initAccessToken() {
   const savedToken = await getStorageItem(TOKEN_KEY);
@@ -152,6 +156,17 @@ export const api = {
     }),
   devices: (homeId: number, areaId?: number) =>
     request<Device[]>('/devices?home_id=' + homeId + (areaId ? '&area_id=' + areaId : '')),
+  device: (deviceId: number) =>
+    request<Device>('/devices/' + deviceId),
+  updateDevice: (deviceId: number, payload: Partial<Device>) =>
+    request<Device>('/devices/' + deviceId, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteDevice: (deviceId: number) =>
+    request<void>('/devices/' + deviceId, {
+      method: 'DELETE',
+    }),
   commandDevice: (
     deviceId: number,
     payload: { is_on?: boolean; state?: Record<string, unknown> },

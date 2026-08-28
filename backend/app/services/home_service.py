@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import EntityNotFoundError, PermissionDeniedError
 from app.models import Home, HomeMember, HomeRole, User, UserRole
+from app.realtime.manager import manager
 from app.repositories.homes import HomeRepository, HomeMemberRepository
 from app.repositories.users import UserRepository
 
@@ -23,8 +24,11 @@ class HomeService:
         if not home:
             raise EntityNotFoundError("Không tìm thấy nhà")
         
+        if home.owner_id == user.id or user.role == UserRole.ADMIN:
+            return home
+            
         member = await self.members.get(home_id, user.id)
-        if not member and user.role != UserRole.ADMIN:
+        if not member:
             raise PermissionDeniedError("Bạn không có quyền truy cập nhà này")
             
         return home
@@ -103,6 +107,15 @@ class HomeService:
         target_member.role = role
         await self.session.commit()
         await self.session.refresh(target_member)
+        
+        # Mô hình 1: Gửi đích danh cho target_user_id
+        await manager.send_personal_message(target_user_id, {
+            "type": "member.role_updated",
+            "user_id": target_user_id,
+            "home_id": home_id,
+            "role": role.value if hasattr(role, 'value') else str(role),
+        })
+        
         return target_member
 
     async def remove_member(self, user: User, home_id: int, target_user_id: int) -> None:
@@ -119,8 +132,17 @@ class HomeService:
             
         # You can remove yourself, OR you need to be OWNER/ADMIN to remove others
         if user.id != target_user_id:
-            if (not member or member.role not in [HomeRole.OWNER, HomeRole.ADMIN]) and user.role != UserRole.ADMIN:
+            is_owner = home.owner_id == user.id
+            is_admin = member and member.role in [HomeRole.OWNER, HomeRole.ADMIN]
+            if not is_owner and not is_admin and user.role != UserRole.ADMIN:
                 raise PermissionDeniedError("Bạn không có quyền xóa thành viên này")
                 
         await self.members.delete(target_member)
         await self.session.commit()
+        
+        # Mô hình 1: Gửi đích danh cho target_user_id
+        await manager.send_personal_message(target_user_id, {
+            "type": "member.removed",
+            "user_id": target_user_id,
+            "home_id": home_id,
+        })
