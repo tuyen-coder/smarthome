@@ -123,6 +123,8 @@ class AutomationRead(ORMModel):
 
 class AlertCreate(BaseModel):
     device_id: int | None = None
+    user_id: int | None = None
+    user_name: str | None = None
     title: str = Field(min_length=2, max_length=160)
     message: str = Field(min_length=2)
     severity: AlertSeverity = AlertSeverity.INFO
@@ -131,6 +133,8 @@ class AlertCreate(BaseModel):
 class AlertRead(ORMModel):
     id: int
     device_id: int | None
+    user_id: int | None
+    user_name: str | None
     title: str
     message: str
     severity: AlertSeverity

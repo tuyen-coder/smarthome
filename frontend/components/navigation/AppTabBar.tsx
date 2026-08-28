@@ -13,7 +13,7 @@ const items: Record<string, { label: string; icon: IconName; activeIcon: IconNam
   devices: { label: 'Thiết bị', icon: 'options-outline', activeIcon: 'options' },
   automations: { label: 'Tự động', icon: 'timer-outline', activeIcon: 'timer' },
   alerts: { label: 'Thống kê', icon: 'bar-chart-outline', activeIcon: 'bar-chart' },
-  profile: { label: 'Cài đặt', icon: 'settings-outline', activeIcon: 'settings' },
+  settings: { label: 'Cài đặt', icon: 'settings-outline', activeIcon: 'settings' },
 };
 
 export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps) {

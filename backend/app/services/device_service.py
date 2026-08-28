@@ -3,6 +3,7 @@ import json
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import EntityNotFoundError, PermissionDeniedError
+from app.core.redis import redis_client
 from app.integrations.mqtt.client import mqtt_client
 from app.models import Device, User
 from app.realtime.manager import manager
@@ -69,5 +70,17 @@ class DeviceService:
             "is_on": device.is_on,
             "state": device.state
         })
+        
+        # --- Đẩy sự kiện vào Redis (Worker xử lý Alert) ---
+        activity_event = {
+            "device_id": device.id,
+            "name": device.name,
+            "category": str(device.category),
+            "is_on": device.is_on,
+            "state": device.state,
+            "user_id": user.id,
+            "user_name": user.name,
+        }
+        await redis_client.lpush("queue:device_activity", json.dumps(activity_event))
         
         return device

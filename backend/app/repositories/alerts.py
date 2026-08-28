@@ -19,12 +19,16 @@ class AlertRepository(Repository[Alert]):
         self,
         *,
         device_id: int | None,
+        user_id: int | None = None,
+        user_name: str | None = None,
         title: str,
         message: str,
         severity: AlertSeverity,
     ) -> Alert:
         alert = Alert(
             device_id=device_id,
+            user_id=user_id,
+            user_name=user_name,
             title=title,
             message=message,
             severity=severity,

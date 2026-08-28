@@ -20,6 +20,8 @@ const severity: Record<AlertSeverity, { icon: IconName; color: string; soft: str
   critical: { icon: 'warning', color: colors.danger, soft: colors.dangerSoft },
 };
 
+import { realtime } from '@/src/services/realtime';
+
 export default function AlertsScreen() {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +36,16 @@ export default function AlertsScreen() {
 
   useEffect(() => {
     fetchAlerts();
+    
+    realtime.connect();
+    const unsubscribe = realtime.subscribe((payload) => {
+      if (payload.type === 'new_alert') {
+        // Có thông báo mới thì tải lại danh sách
+        fetchAlerts();
+      }
+    });
+    
+    return () => unsubscribe();
   }, []);
 
   const markAll = async () => {
@@ -93,6 +105,15 @@ export default function AlertsScreen() {
         ) : (
           alerts.map((alert) => {
             const appearance = severity[alert.severity as AlertSeverity] ?? severity.info;
+            const timeStr = alert.created_at
+              ? new Date(alert.created_at).toLocaleString('vi-VN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                })
+              : '';
             return (
               <Pressable
                 key={alert.id}
@@ -109,6 +130,16 @@ export default function AlertsScreen() {
                 <View style={styles.flex}>
                   <Text style={[styles.alertTitle, { color: appearance.color }]}>{alert.title}</Text>
                   <Text style={styles.alertMessage}>{alert.message}</Text>
+                  <View style={styles.alertMeta}>
+                    <Ionicons name="time-outline" size={12} color={colors.textMuted} />
+                    <Text style={styles.alertTime}>{timeStr}</Text>
+                    {alert.user_name ? (
+                      <>
+                        <Ionicons name="person-outline" size={12} color={colors.textMuted} style={{ marginLeft: 8 }} />
+                        <Text style={styles.alertUser}>{alert.user_name}</Text>
+                      </>
+                    ) : null}
+                  </View>
                 </View>
                 {!alert.is_read ? <View style={styles.unread} /> : null}
               </Pressable>
@@ -146,6 +177,9 @@ const styles = StyleSheet.create({
   alertIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   alertTitle: { fontSize: 13, fontWeight: '700' },
   alertMessage: { marginTop: 4, color: colors.text, fontSize: 14, lineHeight: 19 },
+  alertMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 },
+  alertTime: { color: colors.textMuted, fontSize: 11 },
+  alertUser: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
   unread: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   loadingContainer: { paddingVertical: 30, alignItems: 'center' },
   loadingText: { marginTop: 8, color: colors.textMuted, fontSize: 14 },

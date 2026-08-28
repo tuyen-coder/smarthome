@@ -16,6 +16,8 @@ class AlertService:
     async def create(self, payload: AlertCreate) -> Alert:
         return await self.alerts.create(
             device_id=payload.device_id,
+            user_id=payload.user_id,
+            user_name=payload.user_name,
             title=payload.title,
             message=payload.message,
             severity=payload.severity,

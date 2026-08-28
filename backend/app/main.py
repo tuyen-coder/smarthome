@@ -21,16 +21,39 @@ from app.integrations.mqtt.client import mqtt_client
 from app.realtime.router import router as realtime_router
 
 
+import asyncio
+import json
+from app.core.redis import get_redis
+from app.realtime.manager import manager
+
+async def redis_subscriber():
+    redis = await get_redis()
+    pubsub = redis.pubsub()
+    await pubsub.subscribe("channel:websocket_broadcast")
+    print("Subscribed to channel:websocket_broadcast")
+    async for message in pubsub.listen():
+        if message["type"] == "message":
+            try:
+                data = json.loads(message["data"])
+                await manager.broadcast(data)
+            except Exception as e:
+                print(f"Error broadcasting message: {e}")
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # 1. Khởi tạo Database
     await init_db()
+    
+    # 2. Start Redis subscriber
+    subscriber_task = asyncio.create_task(redis_subscriber())
     
     if settings.mqtt_enabled:
         print("Starting Adafruit MQTT Service...")
         mqtt_client.start()  
     
     yield  
+    
+    subscriber_task.cancel()
     
     if settings.mqtt_enabled:
         print("Stopping Adafruit MQTT Service...")

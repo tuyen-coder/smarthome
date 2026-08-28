@@ -1,4 +1,5 @@
 from sqlalchemy import func, select
+from datetime import datetime
 
 from app.core.security import hash_password
 from app.db.base import Base
@@ -129,21 +130,33 @@ async def init_db() -> None:
         session.add_all([led1, led2, led3, led4, pump, temp_sensor, humi_sensor])
         await session.flush()
 
-        # 4. Tạo Dữ liệu Telemetry, Automations & Alerts
+        # 4. Tạo 20 mẫu Telemetry cho thiết bị 6 (nhiệt độ) và 7 (độ ẩm) cùng Automations & Alerts
         session.add_all(
             [
-                Telemetry(
-                    device_id=temp_sensor.id,
-                    metric="temperature",
-                    value=29.5,
-                    unit="°C",
-                ),
-                Telemetry(
-                    device_id=humi_sensor.id,
-                    metric="humidity",
-                    value=70.0,
-                    unit="%",
-                ),
+                # Cảm biến Nhiệt độ
+                Telemetry(device_id=temp_sensor.id, metric="temperature", value=29.6, unit="°C", recorded_at=datetime(2026, 8, 27, 22, 55, 0)),
+                Telemetry(device_id=temp_sensor.id, metric="temperature", value=29.8, unit="°C", recorded_at=datetime(2026, 8, 27, 23, 0, 0)),
+                Telemetry(device_id=temp_sensor.id, metric="temperature", value=30.1, unit="°C", recorded_at=datetime(2026, 8, 27, 23, 5, 0)),
+                Telemetry(device_id=temp_sensor.id, metric="temperature", value=30.0, unit="°C", recorded_at=datetime(2026, 8, 27, 23, 10, 0)),
+                Telemetry(device_id=temp_sensor.id, metric="temperature", value=29.7, unit="°C", recorded_at=datetime(2026, 8, 27, 23, 15, 0)),
+                Telemetry(device_id=temp_sensor.id, metric="temperature", value=29.5, unit="°C", recorded_at=datetime(2026, 8, 27, 23, 20, 0)),
+                Telemetry(device_id=temp_sensor.id, metric="temperature", value=29.4, unit="°C", recorded_at=datetime(2026, 8, 27, 23, 25, 0)),
+                Telemetry(device_id=temp_sensor.id, metric="temperature", value=29.2, unit="°C", recorded_at=datetime(2026, 8, 27, 23, 30, 0)),
+                Telemetry(device_id=temp_sensor.id, metric="temperature", value=29.1, unit="°C", recorded_at=datetime(2026, 8, 27, 23, 35, 0)),
+                Telemetry(device_id=temp_sensor.id, metric="temperature", value=28.9, unit="°C", recorded_at=datetime(2026, 8, 27, 23, 40, 0)),
+
+                # Cảm biến Độ ẩm
+                Telemetry(device_id=humi_sensor.id, metric="humidity", value=71.0, unit="%", recorded_at=datetime(2026, 8, 27, 22, 55, 0)),
+                Telemetry(device_id=humi_sensor.id, metric="humidity", value=69.5, unit="%", recorded_at=datetime(2026, 8, 27, 23, 0, 0)),
+                Telemetry(device_id=humi_sensor.id, metric="humidity", value=68.0, unit="%", recorded_at=datetime(2026, 8, 27, 23, 5, 0)),
+                Telemetry(device_id=humi_sensor.id, metric="humidity", value=67.5, unit="%", recorded_at=datetime(2026, 8, 27, 23, 10, 0)),
+                Telemetry(device_id=humi_sensor.id, metric="humidity", value=68.0, unit="%", recorded_at=datetime(2026, 8, 27, 23, 15, 0)),
+                Telemetry(device_id=humi_sensor.id, metric="humidity", value=68.5, unit="%", recorded_at=datetime(2026, 8, 27, 23, 20, 0)),
+                Telemetry(device_id=humi_sensor.id, metric="humidity", value=69.0, unit="%", recorded_at=datetime(2026, 8, 27, 23, 25, 0)),
+                Telemetry(device_id=humi_sensor.id, metric="humidity", value=69.2, unit="%", recorded_at=datetime(2026, 8, 27, 23, 30, 0)),
+                Telemetry(device_id=humi_sensor.id, metric="humidity", value=70.1, unit="%", recorded_at=datetime(2026, 8, 27, 23, 35, 0)),
+                Telemetry(device_id=humi_sensor.id, metric="humidity", value=70.5, unit="%", recorded_at=datetime(2026, 8, 27, 23, 40, 0)),
+
                 Automation(
                     name="Tự động bật Đèn 4 khi có người lại gần",
                     enabled=True,
