@@ -48,20 +48,38 @@ def disconnected(client):
     """Callback triggered when the MQTT client disconnects."""
     print("Disconnected from Adafruit IO Broker!")
 
+def parse_color_payload(raw):
+    """Normalizes color inputs (HEX #RRGGBB, space-separated 'r g b', comma 'r,g,b', or 0/1)."""
+    s = str(raw).strip()
+    if s.startswith("#") and len(s) == 7:
+        try:
+            r = int(s[1:3], 16)
+            g = int(s[3:5], 16)
+            b = int(s[5:7], 16)
+            return f"{r},{g},{b}"
+        except Exception:
+            pass
+    elif " " in s:
+        parts = s.replace(",", " ").split()
+        if len(parts) >= 3:
+            return f"{parts[0]},{parts[1]},{parts[2]}"
+    return s
+
 def message(client, feed_id, payload):
     """Callback triggered when a subscribed feed receives a new value from Adafruit IO dashboard."""
     raw_val = str(payload).strip()
     print(f"\n[ADAFRUIT IO INCOMING] Feed: {feed_id} | Payload: {raw_val}")
+    color_val = parse_color_payload(raw_val)
 
     # 1. Multi-LED Feeds (bbc-led1, bbc-led2, bbc-led3, bbc-led4)
     if feed_id == "bbc-led1":
-        cmd = f"LED:1:{raw_val}"
+        cmd = f"LED:1:{color_val}"
     elif feed_id == "bbc-led2":
-        cmd = f"LED:2:{raw_val}"
+        cmd = f"LED:2:{color_val}"
     elif feed_id == "bbc-led3":
-        cmd = f"LED:3:{raw_val}"
+        cmd = f"LED:3:{color_val}"
     elif feed_id == "bbc-led4":
-        cmd = f"LED:4:{raw_val}"
+        cmd = f"LED:4:{color_val}"
     # 2. Main LED Feed (bbc-led)
     elif feed_id == "bbc-led":
         upper = raw_val.upper()
@@ -72,7 +90,7 @@ def message(client, feed_id, payload):
         elif upper in ["L1", "L2", "L3", "L4"]:
             cmd = upper
         else:
-            cmd = raw_val
+            cmd = f"ALL:{color_val}" if (',' in color_val or ' ' in color_val) else raw_val
     # 3. Pump Feed (bbc-pump)
     elif feed_id == "bbc-pump":
         upper = raw_val.upper()
@@ -241,40 +259,75 @@ def console_cli():
     print("\n" + "=" * 65)
     print("  [+] SMART HOME GATEWAY & ADAFRUIT SIMULATOR ACTIVE")
     print("  Type any command below and press Enter:")
-    print("    * L1 / l1  --> Toggle bbc-led1 on Adafruit IO (ON <-> OFF)")
-    print("    * L2 / l2  --> Toggle bbc-led2 on Adafruit IO (ON <-> OFF)")
-    print("    * L3 / l3  --> Toggle bbc-led3 on Adafruit IO (ON <-> OFF)")
-    print("    * L4 / l4  --> Toggle bbc-led4 on Adafruit IO (ON <-> OFF)")
-    print("    * OFF / 0  --> Turn OFF all feeds (0)")
-    print("    * ON       --> Turn ON all feeds (1)")
-    print("    * STATUS   --> Show current toggle states")
+    print("    * L1 / L2 / L3 / L4          --> Toggle LED on/off")
+    print("    * L1 200 200 200 / L1 #FF0000--> Set LED to custom RGB color")
+    print("    * L1 1                       --> Turn ON LED in White")
+    print("    * L1 0                       --> Turn OFF LED")
+    print("    * PUMP / PUMP ON / PUMP OFF  --> Control Water Pump")
+    print("    * OFF / 0                    --> Turn OFF all feeds (0)")
+    print("    * ON / ON 255 255 255        --> Turn ON all feeds (1)")
+    print("    * STATUS                     --> Show current toggle states")
     print("=" * 65 + "\n")
 
     while True:
         try:
-            cmd = input().strip()
-            if not cmd:
+            line_input = input().strip()
+            if not line_input:
                 continue
-            upper_cmd = cmd.upper()
 
-            if upper_cmd in ["L1", "L2", "L3", "L4"]:
-                # Toggle state
-                led_states[upper_cmd] = not led_states[upper_cmd]
-                val = "1" if led_states[upper_cmd] else "0"
-                feed_name = FEED_MAP_CONTROL[upper_cmd]
+            parts = line_input.split()
+            cmd_upper = parts[0].upper()
+
+            if cmd_upper in ["L1", "L2", "L3", "L4"]:
+                feed_name = FEED_MAP_CONTROL[cmd_upper]
+                if len(parts) >= 4:
+                    # L1 200 200 200
+                    val = f"{parts[1]},{parts[2]},{parts[3]}"
+                    led_states[cmd_upper] = True
+                elif len(parts) == 2:
+                    # L1 0, L1 1, L1 #FF0000
+                    arg = parts[1]
+                    if arg == "0":
+                        val = "0"
+                        led_states[cmd_upper] = False
+                    elif arg == "1":
+                        val = "1"
+                        led_states[cmd_upper] = True
+                    else:
+                        val = parse_color_payload(arg)
+                        led_states[cmd_upper] = True
+                else:
+                    # Toggle state
+                    led_states[cmd_upper] = not led_states[cmd_upper]
+                    val = "1" if led_states[cmd_upper] else "0"
 
                 # 1. Publish to Adafruit IO Feed
                 try:
                     client.publish(feed_name, val)
-                    label = "ON (1)" if led_states[upper_cmd] else "OFF (0)"
-                    print(f"  [CONSOLE -> ADAFRUIT IO] Published '{feed_name}' = {val} ({upper_cmd} {label})")
+                    print(f"  [CONSOLE -> ADAFRUIT IO] Published '{feed_name}' = {val} ({cmd_upper})")
                 except Exception as e:
                     print(f"  [!] Error publishing to MQTT: {e}")
 
                 # 2. Also send directly down to serial
-                send_to_serial(f"LED:{upper_cmd[1]}:{val}")
+                send_to_serial(f"LED:{cmd_upper[1]}:{val}")
 
-            elif upper_cmd in ["OFF", "0", "ALL OFF"]:
+            elif cmd_upper in ["PUMP", "P"]:
+                if len(parts) >= 2 and parts[1].upper() in ["ON", "1"]:
+                    pump_state = True
+                elif len(parts) >= 2 and parts[1].upper() in ["OFF", "0"]:
+                    pump_state = False
+                else:
+                    pump_state = not led_states.get("PUMP", False)
+                led_states["PUMP"] = pump_state
+                val = "1" if pump_state else "0"
+                try:
+                    client.publish("bbc-pump", val)
+                    print(f"  [CONSOLE -> ADAFRUIT IO] Published 'bbc-pump' = {val} (PUMP {'ON' if pump_state else 'OFF'})")
+                except Exception as e:
+                    print(f"  [!] Error publishing to MQTT: {e}")
+                send_to_serial(f"PUMP:{val}")
+
+            elif cmd_upper in ["OFF", "0", "ALL OFF"]:
                 for key, feed_name in FEED_MAP_CONTROL.items():
                     led_states[key] = False
                     try:
@@ -283,33 +336,40 @@ def console_cli():
                         pass
                 try:
                     client.publish("bbc-led", "0")
+                    client.publish("bbc-pump", "0")
                 except Exception:
                     pass
+                led_states["PUMP"] = False
                 send_to_serial("OFF")
                 print("  [CONSOLE -> ADAFRUIT IO] All feeds published 0 (OFF)")
 
-            elif upper_cmd in ["ON", "1", "ALL ON"]:
+            elif cmd_upper in ["ON", "1", "ALL ON"]:
+                color_val = "1"
+                if len(parts) >= 4:
+                    color_val = f"{parts[1]},{parts[2]},{parts[3]}"
                 for key, feed_name in FEED_MAP_CONTROL.items():
                     led_states[key] = True
                     try:
-                        client.publish(feed_name, "1")
+                        client.publish(feed_name, color_val)
                     except Exception:
                         pass
                 try:
-                    client.publish("bbc-led", "1")
+                    client.publish("bbc-led", color_val)
+                    client.publish("bbc-pump", "1")
                 except Exception:
                     pass
-                send_to_serial("ON")
-                print("  [CONSOLE -> ADAFRUIT IO] All feeds published 1 (ON)")
+                led_states["PUMP"] = True
+                send_to_serial("ON" if color_val == "1" else f"ALL:{color_val}")
+                print(f"  [CONSOLE -> ADAFRUIT IO] All feeds published ON ({color_val})")
 
-            elif upper_cmd == "STATUS":
+            elif cmd_upper == "STATUS":
                 print("  Current Dashboard States:")
                 for k, v in led_states.items():
-                    print(f"    * {k} ({FEED_MAP_CONTROL[k]}): {'ON' if v else 'OFF'}")
+                    print(f"    * {k} ({FEED_MAP_CONTROL.get(k, 'bbc-pump')}): {'ON' if v else 'OFF'}")
 
             else:
-                send_to_serial(cmd)
-                print(f"  [CONSOLE] Sent raw command -> '{cmd}'")
+                send_to_serial(line_input)
+                print(f"  [CONSOLE] Sent raw command -> '{line_input}'")
 
         except (EOFError, KeyboardInterrupt):
             break

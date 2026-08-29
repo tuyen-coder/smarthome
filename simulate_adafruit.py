@@ -60,14 +60,15 @@ def main():
         return
 
     print("\nSIMULATOR COMMANDS (Type command & press Enter):")
-    print("  • L1       --> Toggle bbc-led1 on Adafruit IO (ON <-> OFF)")
-    print("  • L2       --> Toggle bbc-led2 on Adafruit IO (ON <-> OFF)")
-    print("  • L3       --> Toggle bbc-led3 on Adafruit IO (ON <-> OFF)")
-    print("  • L4       --> Toggle bbc-led4 on Adafruit IO (ON <-> OFF)")
-    print("  • OFF / 0  --> Turn OFF all feeds on Adafruit IO")
-    print("  • ON       --> Turn ON all feeds on Adafruit IO")
-    print("  • STATUS   --> Show current toggle states")
-    print("  • EXIT / Q --> Quit simulator\n")
+    print("  • L1 / L2 / L3 / L4          --> Toggle LED on/off")
+    print("  • L1 200 200 200 / L1 #FF0000--> Set LED to custom RGB color")
+    print("  • L1 1                       --> Turn ON LED in White")
+    print("  • L1 0                       --> Turn OFF LED")
+    print("  • PUMP / PUMP ON / PUMP OFF  --> Control Water Pump")
+    print("  • OFF / 0                    --> Turn OFF all feeds on Adafruit IO")
+    print("  • ON / ON 255 255 255        --> Turn ON all feeds")
+    print("  • STATUS                     --> Show current toggle states")
+    print("  • EXIT / Q                   --> Quit simulator\n")
     print("-" * 65)
 
     try:
@@ -80,29 +81,53 @@ def main():
             if not user_input:
                 continue
 
-            cmd = user_input.upper()
+            parts = user_input.split()
+            cmd = parts[0].upper()
 
             if cmd in ["Q", "QUIT", "EXIT"]:
                 break
 
             if cmd in ["L1", "L2", "L3", "L4"]:
-                # Toggle local state
-                led_states[cmd] = not led_states[cmd]
-                val_to_send = "1" if led_states[cmd] else "0"
                 feed_name = FEED_MAP[cmd]
+                if len(parts) >= 4:
+                    # L1 200 200 200
+                    r, g, b = parts[1], parts[2], parts[3]
+                    val_to_send = f"{r},{g},{b}"
+                    led_states[cmd] = True
+                elif len(parts) == 2:
+                    # L1 0 or L1 1 or L1 #FF0000
+                    arg = parts[1]
+                    if arg == "0":
+                        val_to_send = "0"
+                        led_states[cmd] = False
+                    elif arg == "1":
+                        val_to_send = "1"
+                        led_states[cmd] = True
+                    elif "," in arg:
+                        val_to_send = arg
+                        led_states[cmd] = True
+                    elif arg.startswith("#"):
+                        val_to_send = arg
+                        led_states[cmd] = True
+                    else:
+                        val_to_send = arg
+                        led_states[cmd] = (arg not in ["0", "OFF", "FALSE"])
+                else:
+                    # Toggle state
+                    led_states[cmd] = not led_states[cmd]
+                    val_to_send = "1" if led_states[cmd] else "0"
 
                 # Publish to Adafruit IO Feed
                 try:
                     client.publish(feed_name, val_to_send)
-                    state_label = "ON (1)" if led_states[cmd] else "OFF (0)"
-                    print(f"  [➔ Published] Feed '{feed_name}' = {val_to_send} | {cmd} is now {state_label}")
+                    print(f"  [➔ Published] Feed '{feed_name}' = {val_to_send} ({cmd})")
                 except Exception as err:
                     print(f"  [!] Error publishing: {err}")
 
-            elif cmd in ["PUMP", "P", "PUMP ON", "PUMP OFF"]:
-                if cmd == "PUMP ON":
+            elif cmd in ["PUMP", "P"]:
+                if len(parts) >= 2 and parts[1].upper() in ["ON", "1"]:
                     pump_state = True
-                elif cmd == "PUMP OFF":
+                elif len(parts) >= 2 and parts[1].upper() in ["OFF", "0"]:
                     pump_state = False
                 else:
                     pump_state = not led_states.get("PUMP", False)
@@ -124,13 +149,16 @@ def main():
                 print("  [➔ Published] All feeds set to 0 (OFF).")
 
             elif cmd in ["ON", "1", "ALL ON"]:
+                color_val = "1"
+                if len(parts) >= 4:
+                    color_val = f"{parts[1]},{parts[2]},{parts[3]}"
                 for key, feed_name in FEED_MAP.items():
                     led_states[key] = True
-                    client.publish(feed_name, "1")
-                client.publish("bbc-led", "1")
+                    client.publish(feed_name, color_val)
+                client.publish("bbc-led", color_val)
                 client.publish("bbc-pump", "1")
                 led_states["PUMP"] = True
-                print("  [➔ Published] All feeds set to 1 (ON).")
+                print(f"  [➔ Published] All feeds set to ON ({color_val}).")
 
             elif cmd == "STATUS":
                 print("  Current Dashboard States:")

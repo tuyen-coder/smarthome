@@ -68,19 +68,47 @@ Tạo các feeds sau trên tài khoản Adafruit IO:
 
 ---
 
-## 🧠 Logic Hoạt Động & Quy Luật Tự Động Hóa (Smart Rules)
+### 🔘 Chuỗi 5 Màn Hình LCD (Chuyển đổi bằng Phím A / B):
 
-1. **Điều khiển Đèn LED 1, 2, 3:**
-   * Bật/tắt thủ công độc lập từ Adafruit IO hoặc bấm phím `1`, `2`, `3` trên Remote IR.
-2. **Quy luật Đèn LED 4 (Chiếu sáng tự động & Ưu tiên):**
-   * **Chế độ tự động (Auto Proximity):** Khi có người/vật cản lại gần $\le 20\text{ cm}$, LED 4 tự động bật sáng trong **1.0 giây** rồi tự tắt.
-   * **Chế độ cưỡng bức (Forced ON):** Khi bật LED 4 từ Dashboard (`bbc-led4 = 1`) hoặc Remote phím `4`, LED 4 sẽ **sáng liên tục** (bỏ qua hẹn giờ tắt).
-   * **Khôi phục tự động:** Khi tắt LED 4 (`bbc-led4 = 0`), đèn tắt và **tự động kích hoạt lại chế độ cảm biến khoảng cách**.
-3. **Điều khiển Máy Bơm Nước (Port `P2/P3`):**
-   * Bật/tắt tức thì qua feed `bbc-pump` (`1` = Chạy, `0` = Dừng) hoặc gõ `PUMP` trong terminal.
-4. **Màn hình LCD1602:**
-   * Dòng 1: `T: <Nhiệt độ>C  H: <Độ ẩm>%`
-   * Dòng 2: `D: <Khoảng cách>cm` hoặc hiển thị trạng thái thao tác (`L1: ON`, `PUMP: ON`, v.v.).
+Nhấn **Phím A** (Trang kế tiếp) hoặc **Phím B** (Trang trước) trên mạch Yolo:Bit để chuyển qua **5 màn hình độc lập**:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ 1️⃣ TRANG 0: NHIỆT ĐỘ & ĐỘ ẨM (TEMP & HUMIDITY)              │
+│    Line 1: Temp: 26.7 C                                     │
+│    Line 2: Humi: 59.5 %                                     │
+├─────────────────────────────────────────────────────────────┤
+│ 2️⃣ TRANG 1: TRẠNG THÁI 4 ĐÈN LED (LED STATUS)               │
+│    Line 1: LED 1:0  2:0                                     │
+│    Line 2: LED 3:0  4:0                                     │
+├─────────────────────────────────────────────────────────────┤
+│ 3️⃣ TRANG 2: TRẠNG THÁI MÁY BƠM (WATER PUMP STATE)           │
+│    Line 1: Water Pump State                                 │
+│    Line 2: Pump: OFF (hoặc ON)                              │
+├─────────────────────────────────────────────────────────────┤
+│ 4️⃣ TRANG 3: CẢM BIẾN KHOẢNG CÁCH (DISTANCE SENSOR)          │
+│    Line 1: Distance Sensor                                  │
+│    Line 2: Dist: 25.4 cm                                    │
+├─────────────────────────────────────────────────────────────┤
+│ 5️⃣ TRANG 4: THỐNG KÊ ĐIỆN NĂNG (POWER & ENERGY)             │
+│    Line 1: Power: 1.00 W                                    │
+│    Line 2: Energy: 0.003 Wh                                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🎨 Hỗ Trợ Đổi Màu Đèn RGB (Full Color Control)
+
+Module 4-LED RGB NeoPixel hỗ trợ đầy đủ 16.7 triệu màu sắc qua lệnh:
+* `L1 200 200 200` ➔ Bật LED 1 với màu RGB tùy chỉnh `(200, 200, 200)`.
+* `L1 255 0 0` ➔ Bật LED 1 màu Đỏ.
+* `L1 0 255 0` ➔ Bật LED 1 màu Xanh lá.
+* `L1 0 0 255` ➔ Bật LED 1 màu Xanh dương.
+* `L1 1` ➔ Bật LED 1 màu Trắng chuẩn `(255, 255, 255)`.
+* `L1 0` ➔ Tắt LED 1 `(0, 0, 0)`.
+* `L1 #FFA500` ➔ Bật LED 1 màu Cam qua mã HEX.
+* `ALL 200 200 200` ➔ Đặt tất cả đèn cùng màu.
 
 ---
 

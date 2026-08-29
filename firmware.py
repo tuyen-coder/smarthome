@@ -111,7 +111,7 @@ class LCDDisplay:
             pass
 
     def render_page(self, page, temp=28.0, humi=50.0, dist=0.0, led_states=None, pump_on=False, power=1.0, energy=0.0):
-        """Renders the selected LCD page based on button swaps (0: Temp/Humi, 1: LED/Pump, 2: Dist, 3: Power)."""
+        """Renders the selected LCD page (0: Temp/Humi, 1: LEDs, 2: Pump, 3: Dist, 4: Power)."""
         if not self.addr:
             self._initialize()
         if not self.addr:
@@ -120,21 +120,28 @@ class LCDDisplay:
             led_states = [False, False, False, False]
 
         if page == 0:
-            # 1st Page: TEMP then HUMIDITY
+            # 1. TEMP and HUMIDITY
             line1 = "Temp: " + str(temp) + " C"
             line2 = "Humi: " + str(humi) + " %"
         elif page == 1:
-            # 2nd Page: LED and PUMP
-            l_str = "L1:" + ("1" if led_states[0] else "0") + " L2:" + ("1" if led_states[1] else "0") + " L3:" + ("1" if led_states[2] else "0") + " L4:" + ("1" if led_states[3] else "0")
-            p_str = "Pump: " + ("ON" if pump_on else "OFF")
-            line1 = l_str
-            line2 = p_str
+            # 2. 4 LEDs STATUS
+            s1 = "1" if led_states[0] else "0"
+            s2 = "1" if led_states[1] else "0"
+            s3 = "1" if led_states[2] else "0"
+            s4 = "1" if led_states[3] else "0"
+            line1 = "LED 1:" + s1 + "  2:" + s2
+            line2 = "LED 3:" + s3 + "  4:" + s4
         elif page == 2:
-            # 3rd Page: Distance
+            # 3. PUMP STATUS
+            p_str = "ON" if pump_on else "OFF"
+            line1 = "Water Pump State"
+            line2 = "Pump: " + p_str
+        elif page == 3:
+            # 4. DISTANCE SENSOR
             line1 = "Distance Sensor"
             line2 = "Dist: " + str(round(dist, 1)) + " cm"
-        elif page == 3:
-            # 4th Page: New Power & Energy
+        elif page == 4:
+            # 5. POWER & ENERGY
             line1 = "Power: " + str(round(power, 2)) + " W"
             line2 = "Energy: " + str(round(energy, 3)) + " Wh"
         else:
@@ -294,10 +301,11 @@ class IRRemoteReceiver:
 # 5. LIGHTING CONTROLLER COMPONENT (NEOPIXEL 4-LED RGB ON P0)
 # ==============================================================================
 class LightingController:
-    """Controls the 4-LED RGB module with independent L1-L3 manual control and L4 distance automation."""
+    """Controls the 4-LED RGB module with full RGB color support, independent L1-L3 control, and L4 distance automation."""
     def __init__(self, data_pin=pin0, num_leds=4):
         self.num_leds = num_leds
         self.np = neopixel.NeoPixel(Pin(data_pin.pin if hasattr(data_pin, 'pin') else data_pin), num_leds)
+        self.led_colors = [(0, 0, 0)] * num_leds
         self.led_states = [False] * num_leds
         self.l4_forced_on = False
         self.l4_auto_timer = 0
@@ -305,56 +313,73 @@ class LightingController:
 
     def _sync_hardware(self):
         for i in range(self.num_leds):
-            if self.led_states[i]:
-                self.np[i] = (255, 255, 255)
-            else:
-                self.np[i] = (0, 0, 0)
+            self.np[i] = self.led_colors[i]
         self.np.write()
 
-    def toggle_led(self, led_idx):
-        """Toggles LED (0=L1, 1=L2, 2=L3, 3=L4)."""
+    def set_led_rgb(self, led_idx, r, g, b):
+        """Sets a specific LED to an RGB color tuple (r, g, b)."""
         if 0 <= led_idx < self.num_leds:
-            new_state = not self.led_states[led_idx]
-            self.set_led(led_idx, new_state)
-            return new_state
-        return False
-
-    def set_led(self, led_idx, state):
-        """Explicitly sets LED state with L4 override management."""
-        if 0 <= led_idx < self.num_leds:
-            st = bool(state)
-            self.led_states[led_idx] = st
+            r = max(0, min(255, int(r)))
+            g = max(0, min(255, int(g)))
+            b = max(0, min(255, int(b)))
+            self.led_colors[led_idx] = (r, g, b)
+            self.led_states[led_idx] = (r > 0 or g > 0 or b > 0)
             if led_idx == 3:
-                # If L4 is explicitly commanded, set forced_on state
-                self.l4_forced_on = st
+                self.l4_forced_on = self.led_states[3]
                 self.l4_auto_timer = 0
             self._sync_hardware()
 
-    def set_all(self, r, g, b):
-        for i in range(self.num_leds):
-            self.led_states[i] = (r > 0 or g > 0 or b > 0)
-            self.np[i] = (r, g, b)
-        self.l4_forced_on = self.led_states[3]
-        self.l4_auto_timer = 0
-        self.np.write()
+    def set_led(self, led_idx, val):
+        """Sets LED state or color. val can be bool, 0/1, or 'r,g,b' string."""
+        if not (0 <= led_idx < self.num_leds):
+            return
+        if isinstance(val, str) and (',' in val or ' ' in val):
+            parts = val.replace(',', ' ').split()
+            if len(parts) >= 3:
+                try:
+                    self.set_led_rgb(led_idx, int(parts[0]), int(parts[1]), int(parts[2]))
+                    return
+                except Exception:
+                    pass
+        st = val in [1, True, "1", "ON", "TRUE"]
+        if st:
+            self.set_led_rgb(led_idx, 255, 255, 255)
+        else:
+            self.set_led_rgb(led_idx, 0, 0, 0)
 
-    def turn_off(self):
-        """Turns off all 4 LEDs and resets L4 forced override."""
-        self.led_states = [False] * self.num_leds
-        self.l4_forced_on = False
+    def toggle_led(self, led_idx):
+        if 0 <= led_idx < self.num_leds:
+            if self.led_states[led_idx]:
+                self.set_led_rgb(led_idx, 0, 0, 0)
+                return False
+            else:
+                self.set_led_rgb(led_idx, 255, 255, 255)
+                return True
+        return False
+
+    def set_all(self, r=255, g=255, b=255):
+        for i in range(self.num_leds):
+            self.led_colors[i] = (r, g, b)
+            self.led_states[i] = (r > 0 or g > 0 or b > 0)
+        self.l4_forced_on = self.led_states[3]
         self.l4_auto_timer = 0
         self._sync_hardware()
 
+    def turn_off(self):
+        self.set_all(0, 0, 0)
+        self.l4_forced_on = False
+        self.l4_auto_timer = 0
+
     def trigger_l4_temporary(self, duration_sec=1.0):
-        """Turns ON L4 temporarily for distance proximity trigger."""
         if not self.l4_forced_on:
+            self.led_colors[3] = (255, 255, 255)
             self.led_states[3] = True
             self.l4_auto_timer = time.time() + duration_sec
             self._sync_hardware()
 
     def update_l4_auto(self, current_time):
-        """Turns OFF L4 after proximity timeout if not forced ON."""
         if not self.l4_forced_on and self.l4_auto_timer > 0 and current_time >= self.l4_auto_timer:
+            self.led_colors[3] = (0, 0, 0)
             self.led_states[3] = False
             self.l4_auto_timer = 0
             self._sync_hardware()
@@ -508,16 +533,15 @@ class SmartHomeNode:
         if not cmd:
             return
 
-        # Explicit LED command e.g. LED:1:1, LED:4:0
-        if cmd.startswith("LED:"):
+        # Explicit LED command e.g. LED:1:1, LED:1:0, LED:1:200,200,200
+        if cmd.startswith("LED:") or cmd.startswith("COLOR:"):
             parts = cmd.split(":")
             if len(parts) >= 3:
                 try:
                     idx = int(parts[1]) - 1
-                    state = (parts[2] in ["1", "ON", "TRUE"])
-                    self.lighting.set_led(idx, state)
-                    self.active_status_text = "L" + str(idx+1) + ": " + ("ON" if state else "OFF")
-                    print("!ACK:L" + str(idx+1) + ":" + ("1" if state else "0") + "#")
+                    raw_val = parts[2]
+                    self.lighting.set_led(idx, raw_val)
+                    print("!ACK:L" + str(idx+1) + ":" + raw_val + "#")
                     return
                 except Exception:
                     pass
@@ -597,11 +621,11 @@ class SmartHomeNode:
                 pass
 
             if btn_a_now and not self.btn_a_prev:
-                self.lcd_page = (self.lcd_page + 1) % 4
+                self.lcd_page = (self.lcd_page + 1) % 5
                 self._refresh_lcd()
 
             if btn_b_now and not self.btn_b_prev:
-                self.lcd_page = (self.lcd_page - 1) % 4
+                self.lcd_page = (self.lcd_page - 1) % 5
                 self._refresh_lcd()
 
             self.btn_a_prev = btn_a_now
