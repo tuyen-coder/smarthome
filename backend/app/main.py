@@ -23,8 +23,35 @@ from app.realtime.router import router as realtime_router
 
 import asyncio
 import json
+from datetime import datetime
 from app.core.redis import get_redis
 from app.realtime.manager import manager
+
+async def time_automation_worker():
+    print("Started background task: time_automation_worker")
+    while True:
+        try:
+            now = datetime.now()
+            # Calculate seconds to next minute
+            sleep_seconds = 60 - now.second
+            await asyncio.sleep(sleep_seconds)
+            
+            # Fetch current HH:MM
+            current_time = datetime.now().strftime("%H:%M")
+            print(f"Evaluating time automations for {current_time}...")
+            
+            from app.db.session import SessionLocal
+            from app.services.automation_service import AutomationService
+            async with SessionLocal() as session:
+                auto_service = AutomationService(session)
+                await auto_service.evaluate_time_automations(current_time)
+                
+        except asyncio.CancelledError:
+            print("time_automation_worker cancelled.")
+            break
+        except Exception as e:
+            print(f"Error in time_automation_worker: {e}")
+            await asyncio.sleep(60)
 
 async def redis_subscriber():
     redis = await get_redis()
@@ -52,6 +79,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # 2. Start Redis subscriber
     subscriber_task = asyncio.create_task(redis_subscriber())
     
+    # 3. Start Time Automation Worker
+    time_task = asyncio.create_task(time_automation_worker())
+    
     if settings.mqtt_enabled:
         print("Starting Adafruit MQTT Service...")
         mqtt_client.start()  
@@ -59,6 +89,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield  
     
     subscriber_task.cancel()
+    time_task.cancel()
     
     if settings.mqtt_enabled:
         print("Stopping Adafruit MQTT Service...")

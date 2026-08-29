@@ -4,7 +4,7 @@ from Adafruit_IO import MQTTClient
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models import DeviceType
+from app.models import DeviceType, Area
 from app.realtime.manager import manager as ws_manager
 from app.repositories.devices import DeviceRepository
 from app.schemas import AdafruitFeed
@@ -71,6 +71,24 @@ class AdafruitMQTTService:
                 if device.type in (DeviceType.CLIMATE, DeviceType.OTHER):
                     sensor_service = SensorService(session)
                     await sensor_service.record_telemetry(device, payload)
+                    
+                    # Gọi evaluate_sensor_automations
+                    try:
+                        from app.services.automation_service import AutomationService
+                        auto_service = AutomationService(session)
+                        
+                        # Chỉ hỗ trợ nhiệt độ/độ ẩm tùy theo thiết bị
+                        # Hiện tại giả định CLIMATE báo nhiệt độ hoặc độ ẩm.
+                        # Ta có thể truyền cứng metric hoặc dựa vào tên feed
+                        metric = 'temperature' if 'temp' in feed_id.lower() else 'humidity'
+                        val = float(payload)
+                        
+                        area = await session.get(Area, device.area_id)
+                        if area:
+                            await auto_service.evaluate_sensor_automations(area.home_id, metric, val)
+                    except Exception as e_auto:
+                        print(f"[MQTT Auto Error] {e_auto}")
+                        
                 else:
                     actuator_service = ActuatorService(session)
                     await actuator_service.update_state(device, payload)

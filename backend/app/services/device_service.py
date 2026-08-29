@@ -100,14 +100,15 @@ class DeviceService:
         await self.devices.delete(device)
 
     async def command(
-        self, user: User, device_id: int, payload: DeviceCommand
+        self, user: User | None, device_id: int, payload: DeviceCommand
     ) -> Device:
         device = await self.devices.get(device_id)
         if device is None:
             raise EntityNotFoundError("Không tìm thấy thiết bị")
             
-        if not await self.permissions.can_access(user, device.area_id, control=True):
-            raise PermissionDeniedError("Bạn không có quyền điều khiển thiết bị này")
+        if user is not None:
+            if not await self.permissions.can_access(user, device.area_id, control=True):
+                raise PermissionDeniedError("Bạn không có quyền điều khiển thiết bị này")
             
         device = await self.devices.update_state(
             device,
@@ -150,8 +151,8 @@ class DeviceService:
             "category": str(device.category),
             "is_on": device.is_on,
             "state": device.state,
-            "user_id": user.id,
-            "user_name": user.name,
+            "user_id": user.id if user else None,
+            "user_name": user.name if user else "Hệ thống tự động",
             "home_id": area.home_id if area else None,
         }
         await redis_client.lpush("queue:device_activity", json.dumps(activity_event))

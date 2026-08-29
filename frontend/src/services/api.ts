@@ -181,9 +181,40 @@ export const api = {
   markAllAlertsRead: (homeId: number) =>
     request<void>('/alerts/mark-all-read?home_id=' + homeId, { method: 'PATCH' }),
   automations: (homeId: number) => request<Automation[]>('/automations?home_id=' + homeId),
+  createAutomation: (payload: {
+    home_id: number;
+    name: string;
+    enabled: boolean;
+    trigger: Record<string, unknown>;
+    action: Record<string, unknown>;
+  }) =>
+    request<Automation>('/automations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getAutomation: (automationId: number) => request<Automation>('/automations/' + automationId),
+  updateAutomationFull: (automationId: number, payload: {
+    home_id: number;
+    name: string;
+    enabled: boolean;
+    trigger: Record<string, unknown>;
+    action: Record<string, unknown>;
+  }) =>
+    request<Automation>('/automations/' + automationId, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
   toggleAutomation: (automationId: number, enabled: boolean) =>
     request<Automation>('/automations/' + automationId + '?enabled=' + enabled, {
       method: 'PATCH',
+    }),
+  executeAutomation: (automationId: number) =>
+    request<void>('/automations/' + automationId + '/execute', {
+      method: 'POST',
+    }),
+  deleteAutomation: (automationId: number) =>
+    request<void>('/automations/' + automationId, {
+      method: 'DELETE',
     }),
   users: () => request<User[]>('/users'),
   createUser: (payload: {
