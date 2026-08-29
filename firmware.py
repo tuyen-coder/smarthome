@@ -110,8 +110,8 @@ class LCDDisplay:
         except Exception:
             pass
 
-    def render_page(self, page, temp=28.0, humi=50.0, dist=0.0, led_states=None, pump_on=False):
-        """Renders the selected LCD page based on button swaps."""
+    def render_page(self, page, temp=28.0, humi=50.0, dist=0.0, led_states=None, pump_on=False, power=1.0, energy=0.0):
+        """Renders the selected LCD page based on button swaps (0: Temp/Humi, 1: LED/Pump, 2: Dist, 3: Power)."""
         if not self.addr:
             self._initialize()
         if not self.addr:
@@ -120,25 +120,26 @@ class LCDDisplay:
             led_states = [False, False, False, False]
 
         if page == 0:
-            # Page 0: Environmental Sensors
-            line1 = "T:" + str(temp) + "C H:" + str(round(humi)) + "%"
-            line2 = "Dist: " + str(round(dist)) + "cm"
+            # 1st Page: TEMP then HUMIDITY
+            line1 = "Temp: " + str(temp) + " C"
+            line2 = "Humi: " + str(humi) + " %"
         elif page == 1:
-            # Page 1: 4 LEDs Status
-            s1 = "ON" if led_states[0] else "OFF"
-            s2 = "ON" if led_states[1] else "OFF"
-            s3 = "ON" if led_states[2] else "OFF"
-            s4 = "ON" if led_states[3] else "OFF"
-            line1 = "L1:" + s1 + " L2:" + s2
-            line2 = "L3:" + s3 + " L4:" + s4
+            # 2nd Page: LED and PUMP
+            l_str = "L1:" + ("1" if led_states[0] else "0") + " L2:" + ("1" if led_states[1] else "0") + " L3:" + ("1" if led_states[2] else "0") + " L4:" + ("1" if led_states[3] else "0")
+            p_str = "Pump: " + ("ON" if pump_on else "OFF")
+            line1 = l_str
+            line2 = p_str
         elif page == 2:
-            # Page 2: Pump & System Status
-            p_state = "ON" if pump_on else "OFF"
-            line1 = "Pump: " + p_state
-            line2 = "T:" + str(temp) + "C D:" + str(round(dist)) + "cm"
+            # 3rd Page: Distance
+            line1 = "Distance Sensor"
+            line2 = "Dist: " + str(round(dist, 1)) + " cm"
+        elif page == 3:
+            # 4th Page: New Power & Energy
+            line1 = "Power: " + str(round(power, 2)) + " W"
+            line2 = "Energy: " + str(round(energy, 3)) + " Wh"
         else:
-            line1 = "T:" + str(temp) + "C H:" + str(round(humi)) + "%"
-            line2 = "Dist: " + str(round(dist)) + "cm"
+            line1 = "Temp: " + str(temp) + " C"
+            line2 = "Humi: " + str(humi) + " %"
 
         self.show_message(line1, line2)
 
@@ -461,22 +462,37 @@ class SmartHomeNode:
         self.telemetry_interval = 5.0  # seconds
         self.last_telemetry_time = 0
         self.proximity_threshold_cm = 20.0
-        self.lcd_page = 0  # 0: Sensors, 1: LEDs (L1-L4), 2: Pump
+        self.lcd_page = 0  # 0: Temp/Humi, 1: LED/Pump, 2: Dist, 3: Power
         self.btn_a_prev = False
         self.btn_b_prev = False
         self.cached_temp = 28.0
         self.cached_humi = 50.0
         self.cached_dist = 0.0
+        self.total_energy_wh = 0.0
+        self.last_energy_calc_time = time.time()
+
+    def get_power_energy(self):
+        """Calculates instantaneous power (W) and accumulated energy (Wh)."""
+        num_on = sum(1 for s in self.lighting.led_states if s)
+        power_w = round(1.0 + (num_on * 0.06) + (3.5 if self.pump.is_on else 0.0), 2)
+        now = time.time()
+        dt = max(0, now - self.last_energy_calc_time)
+        self.last_energy_calc_time = now
+        self.total_energy_wh += power_w * (dt / 3600.0)
+        return power_w, round(self.total_energy_wh, 4)
 
     def _refresh_lcd(self):
         """Refreshes the current LCD page with latest device and sensor states."""
+        power_w, energy_wh = self.get_power_energy()
         self.display.render_page(
             self.lcd_page,
             self.cached_temp,
             self.cached_humi,
             self.cached_dist,
             self.lighting.led_states,
-            self.pump.is_on
+            self.pump.is_on,
+            power_w,
+            energy_wh
         )
 
         # 4. Serial Command Receiver (Non-blocking)
@@ -581,11 +597,11 @@ class SmartHomeNode:
                 pass
 
             if btn_a_now and not self.btn_a_prev:
-                self.lcd_page = (self.lcd_page + 1) % 3
+                self.lcd_page = (self.lcd_page + 1) % 4
                 self._refresh_lcd()
 
             if btn_b_now and not self.btn_b_prev:
-                self.lcd_page = (self.lcd_page - 1) % 3
+                self.lcd_page = (self.lcd_page - 1) % 4
                 self._refresh_lcd()
 
             self.btn_a_prev = btn_a_now
@@ -630,11 +646,16 @@ class SmartHomeNode:
                 temp, humi = self.env_sensor.read()
                 self.cached_temp = temp
                 self.cached_humi = humi
+                power_w, energy_wh = self.get_power_energy()
 
                 # Publish serial telemetry packets to Gateway
                 self.telemetry.send_packet(1, "TEMP", temp)
                 time.sleep(0.04)
                 self.telemetry.send_packet(2, "HUMI", humi)
+                time.sleep(0.04)
+                self.telemetry.send_packet(3, "POWER", power_w)
+                time.sleep(0.04)
+                self.telemetry.send_packet(4, "ENERGY", energy_wh)
 
                 # Update LCD with current page
                 self._refresh_lcd()

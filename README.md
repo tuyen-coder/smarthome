@@ -55,8 +55,10 @@ Tạo các feeds sau trên tài khoản Adafruit IO:
 
 | Feed Name | Chiều Dữ Liệu | Giá Trị Hợp Lệ | Hành Động Trên Mạch Thật |
 | :--- | :---: | :---: | :--- |
-| **`bbc-temp`** | Cloud ◄── Board | Số thực (VD: `28.2`) | Dữ liệu nhiệt độ môi trường đo từ DHT20 (°C). |
-| **`bbc-humi`** | Cloud ◄── Board | Số thực (VD: `59.2`) | Dữ liệu độ ẩm môi trường đo từ DHT20 (%). |
+| **`bbc-temp`** | Cloud ◄── Board | Số thực (VD: `26.7`) | Dữ liệu nhiệt độ môi trường đo từ DHT20 (°C). |
+| **`bbc-humi`** | Cloud ◄── Board | Số thực (VD: `58.9`) | Dữ liệu độ ẩm môi trường đo từ DHT20 (%). |
+| **`bbc-power`** | Cloud ◄── Board | Số thực (VD: `1.0` - `4.74`) | Công suất tiêu thụ tức thời của hệ thống (Watt - W). |
+| **`bbc-energy`** | Cloud ◄── Board | Số thực (VD: `0.015`) | Tổng điện năng tích lũy đã tiêu thụ (Watt-giờ - Wh). |
 | **`bbc-led1`** | Cloud ──► Board | `1` / `0` | Bật / Tắt **LED 1**. |
 | **`bbc-led2`** | Cloud ──► Board | `1` / `0` | Bật / Tắt **LED 2**. |
 | **`bbc-led3`** | Cloud ──► Board | `1` / `0` | Bật / Tắt **LED 3**. |

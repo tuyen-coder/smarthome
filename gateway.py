@@ -25,7 +25,9 @@ SUBSCRIBED_FEEDS = ["bbc-led", "bbc-led1", "bbc-led2", "bbc-led3", "bbc-led4", "
 # Feed mapping for incoming serial packets (KEY -> Adafruit IO Feed ID)
 FEED_MAP = {
     "TEMP": "bbc-temp",
-    "HUMI": "bbc-humi"
+    "HUMI": "bbc-humi",
+    "POWER": "bbc-power",
+    "ENERGY": "bbc-energy"
 }
 
 # Serial Connection Setup
