@@ -92,11 +92,21 @@ class LCDDisplay:
             self._initialize()
         if not self.addr:
             return
+
+        f1 = self.format_line(line1)
+        f2 = self.format_line(line2)
+
+        # Anti-flicker cache: only write over I2C if text actually changed!
+        if hasattr(self, '_last_f1') and self._last_f1 == f1 and self._last_f2 == f2:
+            return
+
         try:
             self.move_to(0, 0)
-            self.putstr(self.format_line(line1))
+            self.putstr(f1)
             self.move_to(0, 1)
-            self.putstr(self.format_line(line2))
+            self.putstr(f2)
+            self._last_f1 = f1
+            self._last_f2 = f2
         except Exception:
             pass
 
@@ -452,6 +462,8 @@ class SmartHomeNode:
         self.last_telemetry_time = 0
         self.proximity_threshold_cm = 20.0
         self.lcd_page = 0  # 0: Sensors, 1: LEDs (L1-L4), 2: Pump
+        self.btn_a_prev = False
+        self.btn_b_prev = False
         self.cached_temp = 28.0
         self.cached_humi = 50.0
         self.cached_dist = 0.0
@@ -556,27 +568,28 @@ class SmartHomeNode:
         while True:
             now = time.time()
 
-            # --- 1. Physical Button A / B Page Swapping ---
-            btn_a = False
-            btn_b = False
+            # --- 1. Physical Button A / B Page Swapping (Edge-Triggered) ---
+            btn_a_now = False
+            btn_b_now = False
             try:
-                btn_a = button_a.was_pressed()
+                btn_a_now = button_a.is_pressed()
             except Exception:
                 pass
             try:
-                btn_b = button_b.was_pressed()
+                btn_b_now = button_b.is_pressed()
             except Exception:
                 pass
 
-            if btn_a:
+            if btn_a_now and not self.btn_a_prev:
                 self.lcd_page = (self.lcd_page + 1) % 3
-                print("Button A -> Swapped LCD to Page:", self.lcd_page)
                 self._refresh_lcd()
 
-            if btn_b:
+            if btn_b_now and not self.btn_b_prev:
                 self.lcd_page = (self.lcd_page - 1) % 3
-                print("Button B -> Swapped LCD to Page:", self.lcd_page)
                 self._refresh_lcd()
+
+            self.btn_a_prev = btn_a_now
+            self.btn_b_prev = btn_b_now
 
             # --- 2. Serial Command Polling ---
             if self.spoll and self.spoll.poll(0):
