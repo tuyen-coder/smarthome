@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.exceptions import (
+    AIUnavailableError,
     AuthenticationError,
     ConflictError,
     EntityNotFoundError,
@@ -53,6 +54,8 @@ async def smart_home_error_handler(_: Request, exc: SmartHomeError) -> JSONRespo
         code = status.HTTP_404_NOT_FOUND
     elif isinstance(exc, ConflictError):
         code = status.HTTP_409_CONFLICT
+    elif isinstance(exc, AIUnavailableError):
+        code = status.HTTP_503_SERVICE_UNAVAILABLE
     return JSONResponse(status_code=code, content={"detail": str(exc)})
 
 

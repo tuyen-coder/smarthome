@@ -14,6 +14,14 @@ class AuthenticationError(SmartHomeError):
     """Raised when credentials or access tokens are invalid."""
 
 
+class AIUnavailableError(SmartHomeError):
+    """Raised when the local AI models cannot be loaded."""
+
+
+class InvalidFaceImageError(SmartHomeError):
+    """Raised when an image cannot be used for face processing."""
+
+
 class EntityNotFoundError(SmartHomeError):
     """Raised when a requested database record does not exist."""
 

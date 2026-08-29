@@ -35,7 +35,12 @@ export default function UsersScreen() {
           <Ionicons color={colors.primary} name="arrow-back" size={23} />
         </Pressable>
         <Text style={styles.title}>Quản lý người dùng</Text>
-        <Ionicons color={colors.textMuted} name="ellipsis-vertical" size={20} />
+        <Pressable
+          accessibilityLabel="Kiểm tra nhận diện khuôn mặt"
+          onPress={() => router.push('/admin/faces/recognize')}
+          style={styles.faceTest}>
+          <Ionicons color={colors.primary} name="scan-outline" size={22} />
+        </Pressable>
       </View>
 
       <View style={styles.search}>
@@ -67,7 +72,17 @@ export default function UsersScreen() {
                 {roleLabels[user.role]}
               </Text>
             </View>
-            <Ionicons color={colors.textMuted} name="chevron-forward" size={19} />
+            <Pressable
+              accessibilityLabel={'Đăng ký khuôn mặt cho ' + user.name}
+              onPress={() =>
+                router.push({
+                  pathname: '/admin/users/[id]/face',
+                  params: { id: String(user.id) },
+                })
+              }
+              style={styles.faceButton}>
+              <Ionicons color={colors.primary} name="camera-outline" size={21} />
+            </Pressable>
           </SurfaceCard>
         ))}
       </View>
@@ -94,6 +109,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  faceTest: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, marginLeft: 6, color: colors.primary, fontSize: 23, fontWeight: '700' },
   search: { height: 56, flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, paddingHorizontal: 18, borderRadius: 28, backgroundColor: colors.surface },
   searchInput: { flex: 1, color: colors.text, fontSize: 15 },
@@ -109,6 +125,7 @@ const styles = StyleSheet.create({
   adminRole: { backgroundColor: colors.primaryLight },
   roleText: { color: colors.textMuted, fontSize: 11, fontWeight: '700' },
   adminRoleText: { color: colors.primaryPressed },
+  faceButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: colors.primarySoft },
   permissionInfo: { flexDirection: 'row', gap: 12, marginTop: 34, backgroundColor: colors.infoSoft, borderColor: colors.infoSoft },
   permissionTitle: { color: colors.info, fontSize: 17, fontWeight: '700' },
   permissionText: { marginTop: 5, color: colors.info, fontSize: 12, lineHeight: 19 },

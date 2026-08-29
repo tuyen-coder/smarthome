@@ -143,3 +143,51 @@ class DashboardSummary(BaseModel):
     online_devices: int
     active_devices: int
     unresolved_alerts: int
+
+
+class FaceBox(BaseModel):
+    x: int
+    y: int
+    width: int
+    height: int
+
+
+class FaceDetectionRead(BaseModel):
+    box: FaceBox
+    confidence: float
+    brightness: float
+    sharpness: float
+    quality_score: float
+
+
+class FaceProfileRead(BaseModel):
+    user_id: int
+    sample_count: int
+    model_name: str
+    model_version: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class FaceRecognitionRead(BaseModel):
+    event_id: int
+    recognized: bool
+    user_id: int | None
+    user_name: str | None
+    similarity: float | None
+    threshold: float
+    reason: str
+    detection: FaceDetectionRead
+    liveness_verified: bool = False
+
+
+class FaceAccessEventRead(BaseModel):
+    id: int
+    user_id: int | None
+    user_name: str | None
+    device_id: int | None
+    recognized: bool
+    similarity: float | None
+    reason: str
+    created_at: datetime

@@ -77,3 +77,33 @@ export interface TokenResponse {
   access_token: string;
   token_type: 'bearer';
 }
+
+export interface FaceDetection {
+  box: { x: number; y: number; width: number; height: number };
+  confidence: number;
+  brightness: number;
+  sharpness: number;
+  quality_score: number;
+}
+
+export interface FaceProfile {
+  user_id: number;
+  sample_count: number;
+  model_name: string;
+  model_version: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FaceRecognition {
+  event_id: number;
+  recognized: boolean;
+  user_id?: number | null;
+  user_name?: string | null;
+  similarity?: number | null;
+  threshold: number;
+  reason: string;
+  detection: FaceDetection;
+  liveness_verified: boolean;
+}

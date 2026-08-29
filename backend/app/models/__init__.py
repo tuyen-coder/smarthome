@@ -151,6 +151,56 @@ class AreaPermission(Base):
     can_control: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class FaceProfile(Base):
+    __tablename__ = "face_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    model_name: Mapped[str] = mapped_column(String(80), default="opencv-sface")
+    model_version: Mapped[str] = mapped_column(String(40), default="2021dec")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class FaceEmbedding(Base):
+    __tablename__ = "face_embeddings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("face_profiles.id", ondelete="CASCADE"), index=True
+    )
+    embedding: Mapped[list[float]] = mapped_column(JSON)
+    quality_score: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+
+class FaceAccessEvent(Base):
+    __tablename__ = "face_access_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    device_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devices.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    recognized: Mapped[bool] = mapped_column(Boolean, default=False)
+    similarity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reason: Mapped[str] = mapped_column(String(160))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+
+
 __all__ = [
     "Alert",
     "AlertSeverity",
@@ -159,6 +209,9 @@ __all__ = [
     "Automation",
     "Device",
     "DeviceType",
+    "FaceAccessEvent",
+    "FaceEmbedding",
+    "FaceProfile",
     "Telemetry",
     "User",
     "UserRole",
