@@ -100,16 +100,36 @@ class LCDDisplay:
         except Exception:
             pass
 
-    def update_telemetry(self, temp, humi, dist=None, status_msg=None):
+    def render_page(self, page, temp=28.0, humi=50.0, dist=0.0, led_states=None, pump_on=False):
+        """Renders the selected LCD page based on button swaps."""
         if not self.addr:
             self._initialize()
-        line1 = "Temp: " + str(temp) + " C"
-        if status_msg:
-            line2 = status_msg
-        elif dist is not None and 0 < dist <= 50:
-            line2 = "H:" + str(round(humi)) + "% Dist:" + str(round(dist)) + "cm"
+        if not self.addr:
+            return
+        if led_states is None:
+            led_states = [False, False, False, False]
+
+        if page == 0:
+            # Page 0: Environmental Sensors
+            line1 = "T:" + str(temp) + "C H:" + str(round(humi)) + "%"
+            line2 = "Dist: " + str(round(dist)) + "cm"
+        elif page == 1:
+            # Page 1: 4 LEDs Status
+            s1 = "ON" if led_states[0] else "OFF"
+            s2 = "ON" if led_states[1] else "OFF"
+            s3 = "ON" if led_states[2] else "OFF"
+            s4 = "ON" if led_states[3] else "OFF"
+            line1 = "L1:" + s1 + " L2:" + s2
+            line2 = "L3:" + s3 + " L4:" + s4
+        elif page == 2:
+            # Page 2: Pump & System Status
+            p_state = "ON" if pump_on else "OFF"
+            line1 = "Pump: " + p_state
+            line2 = "T:" + str(temp) + "C D:" + str(round(dist)) + "cm"
         else:
-            line2 = "Humi: " + str(humi) + " %"
+            line1 = "T:" + str(temp) + "C H:" + str(round(humi)) + "%"
+            line2 = "Dist: " + str(round(dist)) + "cm"
+
         self.show_message(line1, line2)
 
 
@@ -431,7 +451,21 @@ class SmartHomeNode:
         self.telemetry_interval = 5.0  # seconds
         self.last_telemetry_time = 0
         self.proximity_threshold_cm = 20.0
-        self.active_status_text = None
+        self.lcd_page = 0  # 0: Sensors, 1: LEDs (L1-L4), 2: Pump
+        self.cached_temp = 28.0
+        self.cached_humi = 50.0
+        self.cached_dist = 0.0
+
+    def _refresh_lcd(self):
+        """Refreshes the current LCD page with latest device and sensor states."""
+        self.display.render_page(
+            self.lcd_page,
+            self.cached_temp,
+            self.cached_humi,
+            self.cached_dist,
+            self.lighting.led_states,
+            self.pump.is_on
+        )
 
         # 4. Serial Command Receiver (Non-blocking)
         try:
@@ -516,61 +550,81 @@ class SmartHomeNode:
             print("!ACK:ALL:1#")
 
     def run(self):
-        print("SmartHomeNode with Dedicated L4 Distance & Override Ready...")
+        print("SmartHomeNode with Button-Controlled LCD Pages (Sensors, LEDs, Pump)...")
+        self._refresh_lcd()
 
         while True:
             now = time.time()
 
-            # --- 1. Serial Command Polling ---
+            # --- 1. Physical Button A / B Page Swapping ---
+            btn_a = False
+            btn_b = False
+            try:
+                btn_a = button_a.was_pressed()
+            except Exception:
+                pass
+            try:
+                btn_b = button_b.was_pressed()
+            except Exception:
+                pass
+
+            if btn_a:
+                self.lcd_page = (self.lcd_page + 1) % 3
+                print("Button A -> Swapped LCD to Page:", self.lcd_page)
+                self._refresh_lcd()
+
+            if btn_b:
+                self.lcd_page = (self.lcd_page - 1) % 3
+                print("Button B -> Swapped LCD to Page:", self.lcd_page)
+                self._refresh_lcd()
+
+            # --- 2. Serial Command Polling ---
             if self.spoll and self.spoll.poll(0):
                 try:
                     line = sys.stdin.readline()
                     if line:
                         self._handle_command(line)
+                        self._refresh_lcd()
                 except Exception:
                     pass
 
-            # --- 2. IR Remote Control ---
+            # --- 3. IR Remote Control ---
             ir_key = self.ir_receiver.scan_key()
             if ir_key:
                 print("IR Remote Key Pressed:", ir_key)
                 if ir_key in ['1', '2', '3', '4']:
                     idx = int(ir_key) - 1
-                    st = self.lighting.toggle_led(idx)
-                    self.active_status_text = "Remote L" + ir_key + ":" + ("ON" if st else "OFF")
+                    self.lighting.toggle_led(idx)
+                    self._refresh_lcd()
                 elif ir_key in ['0', 'A', 'B', 'C', 'D', 'OK', 'F']:
                     self.lighting.turn_off()
-                    self.active_status_text = "Auto Mode Ready"
+                    self._refresh_lcd()
 
-            # --- 3. Proximity Distance Sensing (Auto Trigger for L4 when not forced ON) ---
+            # --- 4. Proximity Distance Sensing (Auto Trigger for L4 when not forced ON) ---
             dist = self.proximity_sensor.read_distance_cm()
+            self.cached_dist = dist
             if not self.lighting.l4_forced_on:
                 if 0 < dist <= self.proximity_threshold_cm:
                     self.lighting.trigger_l4_temporary(duration_sec=1.0)
                 # Auto-off timer after 1 sec
                 self.lighting.update_l4_auto(now)
 
-            # --- 4. Periodic Telemetry & LCD Display Update ---
+            # --- 5. Periodic Telemetry & LCD Display Update ---
             if now - self.last_telemetry_time >= self.telemetry_interval:
                 self.last_telemetry_time = now
 
                 # Read environmental telemetry
                 temp, humi = self.env_sensor.read()
+                self.cached_temp = temp
+                self.cached_humi = humi
 
                 # Publish serial telemetry packets to Gateway
                 self.telemetry.send_packet(1, "TEMP", temp)
                 time.sleep(0.04)
                 self.telemetry.send_packet(2, "HUMI", humi)
 
-                # Format status text if manual control active
-                status_to_show = self.active_status_text
-                if not status_to_show and any(self.lighting.led_states):
-                    states_str = "".join(["1" if s else "0" for s in self.lighting.led_states])
-                    status_to_show = "LEDs: " + states_str
-
-                # Update LCD
-                self.display.update_telemetry(temp, humi, dist, status_to_show)
-                self.active_status_text = None
+                # Update LCD with current page
+                self._refresh_lcd()
 
             time.sleep(0.02)
 
