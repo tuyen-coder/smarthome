@@ -16,8 +16,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { api } from '@/src/services/api';
 import { colors } from '@/src/theme/colors';
+import { useHome } from '@/src/context/HomeContext';
 
 export default function LoginScreen() {
+  const { refreshHomes } = useHome();
   const [email, setEmail] = useState('admin@yolohome.vn');
   const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,6 +31,7 @@ export default function LoginScreen() {
     setError('');
     try {
       await api.login(email.trim(), password);
+      await refreshHomes();
       router.replace('/(tabs)');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Đăng nhập thất bại');

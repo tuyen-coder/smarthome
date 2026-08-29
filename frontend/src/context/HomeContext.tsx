@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { api } from '@/src/services/api';
+import { api, getAccessToken } from '@/src/services/api';
 import { realtime } from '@/src/services/realtime';
 import type { Home } from '@/src/types/domain';
 
@@ -40,6 +40,10 @@ export function HomeProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchHomes = async () => {
+    if (!getAccessToken()) {
+      setIsLoading(false);
+      return;
+    }
     try {
       const fetchedHomes = await api.homes();
       setHomes(fetchedHomes);
