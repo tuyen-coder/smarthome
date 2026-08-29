@@ -42,10 +42,10 @@ def on_disconnect(client):
 
 def main():
     print("=" * 65)
-    print("  🚀 ADAFRUIT IO DASHBOARD SIMULATOR CLI")
-    print(f"  Account: {AIO_USERNAME}")
-    print("  Connecting to Adafruit IO MQTT Cloud...")
+    print("  [+] ADAFRUIT IO DASHBOARD SIMULATOR CLI")
+    print(f"  Connected User: {AIO_USERNAME}")
     print("=" * 65)
+    print("[*] Connecting to Adafruit IO MQTT Broker...")
 
     client = MQTTClient(AIO_USERNAME, AIO_KEY)
     client.on_connect = on_connect
@@ -60,15 +60,15 @@ def main():
         return
 
     print("\nSIMULATOR COMMANDS (Type command & press Enter):")
-    print("  • L1 / L2 / L3 / L4          --> Toggle LED on/off")
-    print("  • L1 200 200 200 / L1 #FF0000--> Set LED to custom RGB color")
-    print("  • L1 1                       --> Turn ON LED in White")
-    print("  • L1 0                       --> Turn OFF LED")
-    print("  • PUMP / PUMP ON / PUMP OFF  --> Control Water Pump")
-    print("  • OFF / 0                    --> Turn OFF all feeds on Adafruit IO")
-    print("  • ON / ON 255 255 255        --> Turn ON all feeds")
-    print("  • STATUS                     --> Show current toggle states")
-    print("  • EXIT / Q                   --> Quit simulator\n")
+    print("  * L1 / L2 / L3 / L4          --> Toggle LED on/off")
+    print("  * L1 200 200 200 / L1 #FF0000--> Set LED to custom RGB color")
+    print("  * L1 1                       --> Turn ON LED in White")
+    print("  * L1 0                       --> Turn OFF LED")
+    print("  * PUMP / PUMP ON / PUMP OFF  --> Control Water Pump")
+    print("  * OFF / 0                    --> Turn OFF all feeds on Adafruit IO")
+    print("  * ON / ON 255 255 255        --> Turn ON all feeds")
+    print("  * STATUS                     --> Show current toggle states")
+    print("  * EXIT / Q                   --> Quit simulator\n")
     print("-" * 65)
 
     try:
@@ -120,7 +120,7 @@ def main():
                 # Publish to Adafruit IO Feed
                 try:
                     client.publish(feed_name, val_to_send)
-                    print(f"  [➔ Published] Feed '{feed_name}' = {val_to_send} ({cmd})")
+                    print(f"  [Published ->] Feed '{feed_name}' = {val_to_send} ({cmd})")
                 except Exception as err:
                     print(f"  [!] Error publishing: {err}")
 
@@ -135,7 +135,7 @@ def main():
                 val_to_send = "1" if pump_state else "0"
                 try:
                     client.publish("bbc-pump", val_to_send)
-                    print(f"  [➔ Published] Feed 'bbc-pump' = {val_to_send} | PUMP is now {'ON (1)' if pump_state else 'OFF (0)'}")
+                    print(f"  [Published ->] Feed 'bbc-pump' = {val_to_send} | PUMP is now {'ON (1)' if pump_state else 'OFF (0)'}")
                 except Exception as err:
                     print(f"  [!] Error publishing pump: {err}")
 
@@ -146,7 +146,7 @@ def main():
                 client.publish("bbc-led", "0")
                 client.publish("bbc-pump", "0")
                 led_states["PUMP"] = False
-                print("  [➔ Published] All feeds set to 0 (OFF).")
+                print("  [Published ->] All feeds set to 0 (OFF).")
 
             elif cmd in ["ON", "1", "ALL ON"]:
                 color_val = "1"
@@ -158,13 +158,13 @@ def main():
                 client.publish("bbc-led", color_val)
                 client.publish("bbc-pump", "1")
                 led_states["PUMP"] = True
-                print(f"  [➔ Published] All feeds set to ON ({color_val}).")
+                print(f"  [Published ->] All feeds set to ON ({color_val}).")
 
             elif cmd == "STATUS":
                 print("  Current Dashboard States:")
                 for k, v in led_states.items():
                     feed = FEED_MAP.get(k, "bbc-pump" if k == "PUMP" else k)
-                    print(f"    • {k} ({feed}): {'ON' if v else 'OFF'}")
+                    print(f"    * {k} ({feed}): {'ON' if v else 'OFF'}")
 
             else:
                 print(f"  [?] Unknown command '{cmd}'. Available: L1, L2, L3, L4, OFF, ON, STATUS, EXIT")

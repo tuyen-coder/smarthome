@@ -484,7 +484,7 @@ class SmartHomeNode:
         self.telemetry = TelemetryBridge()
 
         # 3. State & Control Modes
-        self.telemetry_interval = 5.0  # seconds
+        self.telemetry_interval = 10.0  # seconds (Prevents Adafruit IO 429 Rate Limit Throttling)
         self.last_telemetry_time = 0
         self.proximity_threshold_cm = 20.0
         self.lcd_page = 0  # 0: Temp/Humi, 1: LED/Pump, 2: Dist, 3: Power
