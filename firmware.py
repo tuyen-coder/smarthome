@@ -5,6 +5,19 @@ from machine import Pin, SoftI2C
 from yolobit import *
 import neopixel
 
+try:
+    import urandom as random
+except ImportError:
+    import random
+
+def rand_jitter(min_sec=9.0, max_sec=12.0):
+    """Returns a randomized float interval between min_sec and max_sec."""
+    try:
+        r = random.random()
+    except Exception:
+        r = 0.5
+    return min_sec + r * (max_sec - min_sec)
+
 # ==============================================================================
 # 1. LCD1602 DISPLAY COMPONENT (I2C / PCF8574 + HD44780)
 # ==============================================================================
@@ -483,11 +496,15 @@ class SmartHomeNode:
         self.pump = PumpController(pin2)
         self.telemetry = TelemetryBridge()
 
-        # 3. State & Control Modes
-        self.telemetry_interval = 10.0  # seconds (Prevents Adafruit IO 429 Rate Limit Throttling)
-        self.last_telemetry_time = 0
+        # 3. State & Control Modes (Staggered & Randomized Telemetry ~10s each)
+        now = time.time()
+        self.next_temp_time = now + rand_jitter(1.0, 2.5)
+        self.next_humi_time = now + rand_jitter(3.5, 5.0)
+        self.next_power_time = now + rand_jitter(6.0, 7.5)
+        self.next_energy_time = now + rand_jitter(8.5, 10.0)
+
         self.proximity_threshold_cm = 20.0
-        self.lcd_page = 0  # 0: Temp/Humi, 1: LED/Pump, 2: Dist, 3: Power
+        self.lcd_page = 0  # 0: Temp/Humi, 1: LEDs, 2: Pump, 3: Dist, 4: Power
         self.btn_a_prev = False
         self.btn_b_prev = False
         self.cached_temp = 28.0
@@ -662,26 +679,37 @@ class SmartHomeNode:
                 # Auto-off timer after 1 sec
                 self.lighting.update_l4_auto(now)
 
-            # --- 5. Periodic Telemetry & LCD Display Update ---
-            if now - self.last_telemetry_time >= self.telemetry_interval:
-                self.last_telemetry_time = now
-
-                # Read environmental telemetry
+            # --- 5. Staggered & Randomized Telemetry Publishing (~10s each, spaced ~2.5s apart) ---
+            # Metric 1: Temperature (every ~10s)
+            if now >= self.next_temp_time:
+                self.next_temp_time = now + rand_jitter(9.0, 12.0)
                 temp, humi = self.env_sensor.read()
                 self.cached_temp = temp
                 self.cached_humi = humi
-                power_w, energy_wh = self.get_power_energy()
-
-                # Publish serial telemetry packets to Gateway
                 self.telemetry.send_packet(1, "TEMP", temp)
-                time.sleep(0.04)
-                self.telemetry.send_packet(2, "HUMI", humi)
-                time.sleep(0.04)
-                self.telemetry.send_packet(3, "POWER", power_w)
-                time.sleep(0.04)
-                self.telemetry.send_packet(4, "ENERGY", energy_wh)
+                self._refresh_lcd()
 
-                # Update LCD with current page
+            # Metric 2: Humidity (every ~10s, offset)
+            if now >= self.next_humi_time:
+                self.next_humi_time = now + rand_jitter(9.0, 12.0)
+                temp, humi = self.env_sensor.read()
+                self.cached_temp = temp
+                self.cached_humi = humi
+                self.telemetry.send_packet(2, "HUMI", humi)
+                self._refresh_lcd()
+
+            # Metric 3: Power (every ~10s, offset)
+            if now >= self.next_power_time:
+                self.next_power_time = now + rand_jitter(9.0, 12.0)
+                power_w, energy_wh = self.get_power_energy()
+                self.telemetry.send_packet(3, "POWER", power_w)
+                self._refresh_lcd()
+
+            # Metric 4: Energy (every ~10s, offset)
+            if now >= self.next_energy_time:
+                self.next_energy_time = now + rand_jitter(9.0, 12.0)
+                power_w, energy_wh = self.get_power_energy()
+                self.telemetry.send_packet(4, "ENERGY", energy_wh)
                 self._refresh_lcd()
 
             time.sleep(0.02)
