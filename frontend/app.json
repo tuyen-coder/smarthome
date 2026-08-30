@@ -17,7 +17,15 @@
     "web": {
       "output": "static"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Cho phép Smart Home dùng camera để đăng ký và nhận diện khuôn mặt."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

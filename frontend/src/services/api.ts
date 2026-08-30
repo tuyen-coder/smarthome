@@ -6,6 +6,8 @@ import type {
   Automation,
   DashboardSummary,
   Device,
+  FaceProfile,
+  FaceRecognition,
   TokenResponse,
   User,
 } from '@/src/types/domain';
@@ -13,11 +15,12 @@ import type {
 let accessToken = '';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const response = await fetch(env.API_URL + path, {
     ...options,
     headers: {
       Accept: 'application/json',
-      'Content-Type': 'application/json',
+      ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
       ...(accessToken ? { Authorization: 'Bearer ' + accessToken } : {}),
       ...options.headers,
     },
@@ -31,6 +34,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return undefined as T;
   }
   return response.json() as Promise<T>;
+}
+
+async function imageForm(uris: string[], field = 'files') {
+  const form = new FormData();
+  for (const [index, uri] of uris.entries()) {
+    if (typeof document !== 'undefined') {
+      const blob = await fetch(uri).then((response) => response.blob());
+      form.append(field, blob, `face-${index + 1}.jpg`);
+    } else {
+      form.append(
+        field,
+        { uri, name: `face-${index + 1}.jpg`, type: 'image/jpeg' } as unknown as Blob,
+      );
+    }
+  }
+  return form;
 }
 
 export const api = {
@@ -95,4 +114,20 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
+  async enrollFace(userId: number, imageUris: string[]) {
+    return request<FaceProfile>('/faces/users/' + userId + '/enroll', {
+      method: 'POST',
+      body: await imageForm(imageUris),
+    });
+  },
+  faceProfile: (userId: number) =>
+    request<FaceProfile>('/faces/users/' + userId),
+  deleteFaceProfile: (userId: number) =>
+    request<void>('/faces/users/' + userId, { method: 'DELETE' }),
+  async recognizeFace(imageUri: string) {
+    return request<FaceRecognition>('/faces/recognize', {
+      method: 'POST',
+      body: await imageForm([imageUri], 'file'),
+    });
+  },
 };

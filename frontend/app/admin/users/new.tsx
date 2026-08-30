@@ -24,8 +24,11 @@ export default function NewUserScreen() {
   const submit = async () => {
     setError('');
     try {
-      await api.createUser({ name, email, role, password: 'changeme123' });
-      router.back();
+      const user = await api.createUser({ name, email, role, password: 'changeme123' });
+      router.replace({
+        pathname: '/admin/users/[id]/face',
+        params: { id: String(user.id) },
+      });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không thể thêm người dùng');
     }
@@ -44,7 +47,7 @@ export default function NewUserScreen() {
         <Ionicons color={colors.textMuted} name="camera-outline" size={32} />
         <View style={styles.edit}><Ionicons color={colors.surface} name="pencil" size={12} /></View>
       </View>
-      <Text style={styles.photoLabel}>Tải ảnh đại diện</Text>
+      <Text style={styles.photoLabel}>Khuôn mặt sẽ được đăng ký sau khi tạo người dùng</Text>
 
       <Text style={styles.label}>Họ và tên</Text>
       <TextInput
