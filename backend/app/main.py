@@ -23,22 +23,38 @@ from app.realtime.router import router as realtime_router
 
 import asyncio
 import json
+import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from app.core.redis import get_redis
 from app.realtime.manager import manager
 
+logger = logging.getLogger(__name__)
+
 async def time_automation_worker():
-    print("Started background task: time_automation_worker")
+    logger.info("Started background task: time_automation_worker")
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("Asia/Ho_Chi_Minh")
+    except Exception:
+        from datetime import timezone, timedelta
+        tz = timezone(timedelta(hours=7))
+    last_processed_time = None
     while True:
         try:
-            now = datetime.now()
+            now = datetime.now(tz)
             # Calculate seconds to next minute
             sleep_seconds = 60 - now.second
+            with open("time_worker.log", "a") as f: f.write(f"Sleeping {sleep_seconds}s at {now}\n")
             await asyncio.sleep(sleep_seconds)
             
             # Fetch current HH:MM
-            current_time = datetime.now().strftime("%H:%M")
-            print(f"Evaluating time automations for {current_time}...")
+            current_time = datetime.now(tz).strftime("%H:%M")
+            with open("time_worker.log", "a") as f: f.write(f"Woke up at {datetime.now(tz)}, current_time={current_time}, last={last_processed_time}\n")
+            if current_time == last_processed_time:
+                continue
+            last_processed_time = current_time
+            # Dọn dẹp log rác: bỏ câu lệnh print mỗi phút
             
             from app.db.session import SessionLocal
             from app.services.automation_service import AutomationService
@@ -47,17 +63,19 @@ async def time_automation_worker():
                 await auto_service.evaluate_time_automations(current_time)
                 
         except asyncio.CancelledError:
-            print("time_automation_worker cancelled.")
+            with open("time_worker.log", "a") as f: f.write("cancelled\n")
+            logger.info("time_automation_worker cancelled.")
             break
         except Exception as e:
-            print(f"Error in time_automation_worker: {e}")
+            with open("time_worker.log", "a") as f: f.write(f"Error: {e}\n")
+            logger.error(f"Error in time_automation_worker: {e}")
             await asyncio.sleep(60)
 
 async def redis_subscriber():
     redis = await get_redis()
     pubsub = redis.pubsub()
     await pubsub.subscribe("channel:websocket_broadcast")
-    print("Subscribed to channel:websocket_broadcast")
+    logger.info("Subscribed to channel:websocket_broadcast")
     async for message in pubsub.listen():
         if message["type"] == "message":
             try:
@@ -69,7 +87,7 @@ async def redis_subscriber():
                 else:
                     await manager.broadcast(data)
             except Exception as e:
-                print(f"Error broadcasting message: {e}")
+                logger.error(f"Error broadcasting message: {e}")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -83,7 +101,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     time_task = asyncio.create_task(time_automation_worker())
     
     if settings.mqtt_enabled:
-        print("Starting Adafruit MQTT Service...")
+        logger.info("Starting Adafruit MQTT Service...")
         mqtt_client.start()  
     
     yield  
@@ -92,7 +110,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     time_task.cancel()
     
     if settings.mqtt_enabled:
-        print("Stopping Adafruit MQTT Service...")
+        logger.info("Stopping Adafruit MQTT Service...")
         mqtt_client.stop()   
 
 

@@ -37,7 +37,7 @@ class RealtimeService {
     this.socket = new WebSocket(wsUrl);
 
     this.socket.onopen = () => {
-      console.log('[WS] Connected to realtime gateway');
+      // console.log('[WS] Connected to realtime gateway');
       const curToken = getAccessToken();
       if (curToken) {
         this.socket?.send(
@@ -60,7 +60,7 @@ class RealtimeService {
     };
 
     this.socket.onclose = () => {
-      console.log('[WS] Disconnected');
+      // console.log('[WS] Disconnected');
       this.socket = null;
       if (!this.isExplicitlyClosed) {
         this.scheduleReconnect();
@@ -85,7 +85,7 @@ class RealtimeService {
   private scheduleReconnect() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = setTimeout(() => {
-      console.log('[WS] Reconnecting...');
+      // console.log('[WS] Reconnecting...');
       this.connect();
     }, 3000);
   }

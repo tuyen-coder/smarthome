@@ -62,7 +62,7 @@ class AutomationService:
                 device_id = device_action.get("id")
                 is_on = device_action.get("is_on")
                 if device_id is not None and is_on is not None:
-                    payload = DeviceCommand(is_on=is_on)
+                    payload = DeviceCommand(is_on=is_on, state=device_action.get("state", {}))
                     await device_service.command(user, device_id, payload)
             except Exception as e:
                 print(f"Error executing scene device {device_action.get('id')}: {e}")
@@ -130,7 +130,7 @@ class AutomationService:
                 device_id = device_action.get("id")
                 is_on = device_action.get("is_on")
                 if device_id is not None and is_on is not None:
-                    payload = DeviceCommand(is_on=is_on)
+                    payload = DeviceCommand(is_on=is_on, state=device_action.get("state", {}))
                     await device_service.command(None, device_id, payload)
             except Exception as e:
                 print(f"Error executing internal automation device {device_action.get('id')}: {e}")

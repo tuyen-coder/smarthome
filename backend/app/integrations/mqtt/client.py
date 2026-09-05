@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Any
 from Adafruit_IO import MQTTClient
 
@@ -11,6 +12,7 @@ from app.schemas import AdafruitFeed
 from app.services.actuator_service import ActuatorService
 from app.services.sensor_service import SensorService
 
+logger = logging.getLogger(__name__)
 
 class AdafruitMQTTService:
 
@@ -28,15 +30,15 @@ class AdafruitMQTTService:
         self.client.on_message = self._on_message
 
     def _on_connect(self, client):
-        print("[MQTT] Đã kết nối thành công đến Adafruit IO!")
+        logger.info("[MQTT] Đã kết nối thành công đến Adafruit IO!")
         for feed in AdafruitFeed:
             self.client.subscribe(feed.value)
 
     def _on_disconnect(self, client):
-        print("[MQTT] Đã ngắt kết nối khỏi Adafruit IO!")
+        logger.info("[MQTT] Đã ngắt kết nối khỏi Adafruit IO!")
 
     def _on_message(self, client, feed_id: str, payload: str):
-        print(f"[MQTT Received] Feed: {feed_id} | Data: {payload}")
+        # logger.debug(f"[MQTT Received] Feed: {feed_id} | Data: {payload}")
         if self.loop and self.loop.is_running():
             asyncio.run_coroutine_threadsafe(
                 self._process_and_broadcast(feed_id, payload), self.loop
@@ -49,11 +51,9 @@ class AdafruitMQTTService:
             # Chuyển payload về chuỗi (String) trước khi gửi qua MQTT
             str_payload = str(payload)
             self.client.publish(feed_key, str_payload)
-            print(
-                f"[MQTT Sent] Feed: '{feed_key}' | Payload: '{str_payload}'"
-            )
+            # logger.debug(f"[MQTT Sent] Feed: '{feed_key}' | Payload: '{str_payload}'")
         except Exception as e:
-            print(f"[MQTT Publish Error] Feed '{feed_key}': {e}")
+            logger.error(f"[MQTT Publish Error] Feed '{feed_key}': {e}")
 
     async def _process_and_broadcast(self, feed_id: str, payload: str):
         try:
@@ -63,9 +63,7 @@ class AdafruitMQTTService:
                 device = await device_repo.get_by_feed_key(feed_id)
 
                 if not device:
-                    print(
-                        f"[MQTT Warning] Không tìm thấy Device gắn với feed_key: '{feed_id}'"
-                    )
+                    logger.warning(f"[MQTT Warning] Không tìm thấy Device gắn với feed_key: '{feed_id}'")
                     return
 
                 if device.type in (DeviceType.CLIMATE, DeviceType.OTHER):
@@ -87,7 +85,7 @@ class AdafruitMQTTService:
                         if area:
                             await auto_service.evaluate_sensor_automations(area.home_id, metric, val)
                     except Exception as e_auto:
-                        print(f"[MQTT Auto Error] {e_auto}")
+                        logger.error(f"[MQTT Auto Error] {e_auto}")
                         
                 else:
                     actuator_service = ActuatorService(session)
@@ -101,7 +99,7 @@ class AdafruitMQTTService:
                 "value": payload,
             })
         except Exception as e:
-            print(f"[MQTT Error] Lỗi xử lý feed '{feed_id}': {e}")
+            logger.error(f"[MQTT Error] Lỗi xử lý feed '{feed_id}': {e}")
 
     def start(self):
         self.loop = asyncio.get_running_loop()

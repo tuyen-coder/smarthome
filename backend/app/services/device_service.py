@@ -71,7 +71,7 @@ class DeviceService:
             if not target_area or target_area.home_id != area.home_id:
                 raise EntityNotFoundError("Khu vực mới không hợp lệ hoặc không thuộc ngôi nhà này")
 
-        return await self.devices.update(
+        updated_device = await self.devices.update(
             device,
             name=payload.name,
             category=payload.category,
@@ -79,6 +79,16 @@ class DeviceService:
             area_id=payload.area_id,
             feed_key=payload.feed_key,
         )
+        
+        await manager.broadcast_to_home(area.home_id, {
+            "type": "device.updated", 
+            "home_id": area.home_id,
+            "device_id": updated_device.id,
+            "is_on": updated_device.is_on,
+            "state": updated_device.state
+        })
+        
+        return updated_device
 
     async def delete(self, user: User, device_id: int) -> None:
         device = await self.devices.get(device_id)

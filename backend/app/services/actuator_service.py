@@ -18,4 +18,3 @@ class ActuatorService:
         device.state = {**device.state, "last_payload": payload}
 
         await self.session.commit()
-        print(f"[DB Updated] Actuator | Device #{device.id} ({device.name}) -> is_on={is_on}")

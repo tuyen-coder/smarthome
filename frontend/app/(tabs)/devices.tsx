@@ -6,7 +6,6 @@ import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleS
 
 import { AppHeader } from '@/components/common/AppHeader';
 import { AppScreen } from '@/components/common/AppScreen';
-import { BrightnessSlider } from '@/components/common/BrightnessSlider';
 import { SurfaceCard } from '@/components/common/SurfaceCard';
 import { api } from '@/src/services/api';
 import { realtime } from '@/src/services/realtime';
@@ -27,7 +26,6 @@ const icons: Record<DeviceType, IconName> = {
 };
 
 function deviceStatus(device: Device) {
-  if (typeof device.state?.brightness === 'number') return `Độ sáng: ${device.state.brightness}%`;
   if (typeof device.state?.temperature === 'number') return `Đang bật • ${device.state.temperature}°C`;
   if (device.state?.air_quality) return `Hoạt động: ${device.state.air_quality}`;
   if (device.state?.speed) return `Tốc độ: ${device.state.speed}`;
@@ -167,22 +165,6 @@ export default function DevicesScreen() {
     });
   };
 
-  const updateBrightness = (deviceId: number, brightness: number) => {
-    setDevices((items) =>
-      items.map((item) =>
-        item.id === deviceId
-          ? { ...item, state: { ...item.state, brightness: Math.round(brightness) } }
-          : item,
-      ),
-    );
-  };
-
-  const saveBrightness = async (deviceId: number, brightness: number) => {
-    await api
-      .commandDevice(deviceId, { state: { brightness } })
-      .catch(() => undefined);
-  };
-
   return (
     <AppScreen
       refreshControl={
@@ -290,22 +272,7 @@ export default function DevicesScreen() {
                   </View>
                 </View>
 
-                {device.type === 'light' && device.state?.brightness !== undefined ? (
-                  <View style={styles.sliderWrapper}>
-                    <BrightnessSlider
-                      disabled={!hasControl}
-                      onChange={(brightness) => updateBrightness(device.id, brightness)}
-                      onComplete={(brightness) => saveBrightness(device.id, brightness)}
-                      value={Number(device.state.brightness ?? 0)}
-                    />
-                    {!hasControl && (
-                      <Pressable
-                        onPress={handleDeniedAccess}
-                        style={StyleSheet.absoluteFill}
-                      />
-                    )}
-                  </View>
-                ) : null}
+
 
                 {device.state?.power_watts ? (
                   <View style={styles.metaRow}>

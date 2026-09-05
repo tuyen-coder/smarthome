@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 
 import { AppScreen } from '@/components/common/AppScreen';
-import { BrightnessSlider } from '@/components/common/BrightnessSlider';
 import { SurfaceCard } from '@/components/common/SurfaceCard';
 import { api } from '@/src/services/api';
 import { realtime } from '@/src/services/realtime';
@@ -52,7 +51,6 @@ export default function DeviceDetailScreen() {
   const [areaId, setAreaId] = useState<number | null>(null);
   const [feedKey, setFeedKey] = useState('');
   const [isOn, setIsOn] = useState(false);
-  const [brightness, setBrightness] = useState(100);
 
   const canEdit = activeHomeRole === 'owner' || activeHomeRole === 'admin';
 
@@ -78,9 +76,6 @@ export default function DeviceDetailScreen() {
       setAreaId(dev.area_id);
       setFeedKey(dev.feed_key || '');
       setIsOn(dev.is_on);
-      if (typeof dev.state?.brightness === 'number') {
-        setBrightness(dev.state.brightness);
-      }
 
       if (activeHome) {
         const areaList = await api.areas(activeHome.id);
@@ -116,9 +111,6 @@ export default function DeviceDetailScreen() {
         if (typeof payload.is_on === 'boolean') {
           setIsOn(payload.is_on);
         }
-        if (payload.state && typeof (payload.state as Record<string, unknown>).brightness === 'number') {
-          setBrightness((payload.state as Record<string, number>).brightness);
-        }
       }
     });
 
@@ -145,19 +137,6 @@ export default function DeviceDetailScreen() {
       console.error('[DeviceDetail] Command error:', err);
       setIsOn(!next);
       Alert.alert('Lỗi', 'Không thể gửi lệnh đến thiết bị.');
-    }
-  };
-
-  const handleBrightnessChange = (val: number) => {
-    setBrightness(Math.round(val));
-  };
-
-  const handleBrightnessComplete = async (val: number) => {
-    if (!device || !canControl) return;
-    try {
-      await api.commandDevice(device.id, { state: { brightness: Math.round(val) } });
-    } catch (err) {
-      console.error('[DeviceDetail] Brightness error:', err);
     }
   };
 
@@ -325,21 +304,6 @@ export default function DeviceDetailScreen() {
             ) : null}
           </View>
 
-          {/* Quick Brightness Slider if light */}
-          {type === 'light' ? (
-            <View style={styles.heroSliderSection}>
-              <View style={styles.sliderHeader}>
-                <Text style={styles.sliderLabel}>Độ sáng</Text>
-                <Text style={styles.sliderValue}>{brightness}%</Text>
-              </View>
-              <BrightnessSlider
-                disabled={!canControl}
-                onChange={handleBrightnessChange}
-                onComplete={handleBrightnessComplete}
-                value={brightness}
-              />
-            </View>
-          ) : null}
         </SurfaceCard>
 
         {/* Edit Form Section */}
